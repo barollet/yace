@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 bitboard = { path = "../bitboard" }
+board = { path = "../board"}
 rand = "0.9.1"

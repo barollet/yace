@@ -30,6 +30,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c8214115b7bf84099f1309324e63141d4c5d7cc26862f97a0a857dbefe165bd"
 
 [[package]]
+name = "board"
+version = "0.1.0"
+dependencies = [
+ "bit-iter",
+ "bitboard",
+ "bitfield-struct",
+ "enum_ext",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -51,6 +61,7 @@ name = "generate_magic"
 version = "0.1.0"
 dependencies = [
  "bitboard",
+ "board",
  "rand",
 ]
 
@@ -71,16 +82,6 @@ name = "libc"
 version = "0.2.172"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d750af042f7ef4f724306de029d18836c26c1765a54a6a3f094cbd23a7267ffa"
-
-[[package]]
-name = "move_gen"
-version = "0.1.0"
-dependencies = [
- "bit-iter",
- "bitboard",
- "bitfield-struct",
- "enum_ext",
-]
 
 [[package]]
 name = "ppv-lite86"

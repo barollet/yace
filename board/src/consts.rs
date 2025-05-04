@@ -5,7 +5,7 @@ pub type Color = bool;
 pub const WHITE: Color = false;
 pub const BLACK: Color = true;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Copy, PartialEq)]
 #[enum_extend(IntType = "u8")]
 pub enum Piece {
     Queen = 0,

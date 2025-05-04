@@ -1,16 +1,18 @@
 pub use bitboard::*;
 use consts::*;
-use enum_indexed::{ColorIndexed, PieceIndexed};
+use enum_indexed::*;
 
 mod consts;
 mod enum_indexed;
+pub mod magic_table;
 mod move_gen;
 mod moves;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Board {
     pieces: ColorIndexed<Bitboard>,
     bitboards: PieceIndexed<Bitboard>,
+    squares: [Option<Piece>; 64],
     to_move: Color,
 }
 
@@ -28,9 +30,19 @@ impl Board {
         bitboards[QUEEN] = D1.to_bitboard() | D8.to_bitboard();
         bitboards[KING] = E1.to_bitboard() | E8.to_bitboard();
 
+        let mut squares = [None; 64];
+        let backrank = [ROOK, KNIGHT, BISHOP, QUEEN, KING, BISHOP, KNIGHT, ROOK];
+        for (&file, piece) in FILE_LIST.iter().zip(backrank) {
+            squares[square_from_name(file, 2) as usize] = Some(PAWN);
+            squares[square_from_name(file, 7) as usize] = Some(PAWN);
+            squares[square_from_name(file, 1) as usize] = Some(piece);
+            squares[square_from_name(file, 8) as usize] = Some(piece);
+        }
+        
         Board {
             pieces,
             bitboards,
+            squares,
             to_move: WHITE,
         }
     }
@@ -39,17 +51,11 @@ impl Board {
         for rank in RANK_LIST.into_iter().rev() {
             for file in FILE_LIST {
                 let square = Square::new(file, rank);
-                if (self.pieces[WHITE] | self.pieces[BLACK]).has(square) {
-                    let lowercase = self.pieces[BLACK].has(square);
-                    let piece = Piece::from_ordinal(
-                        self.bitboards.0.iter()
-                        .position(|bb| bb.has(square))
-                        .expect("No piece found on square"))
-                    .expect("Cannot convert this number to a piece");
-                    if lowercase {
-                        print!("{}", char::from(piece))
-                    } else {
+                if let Some(piece) = self.squares[square as usize] {
+                    if self.pieces[WHITE].has(square) {
                         print!("{}", char::from(piece).to_uppercase())
+                    } else {
+                        print!("{}", char::from(piece))
                     }
                 } else {
                     print!(".")
@@ -57,5 +63,11 @@ impl Board {
             }
             println!()
         }
+    }
+}
+
+impl Default for Board {
+    fn default() -> Self {
+        Self::new()
     }
 }
