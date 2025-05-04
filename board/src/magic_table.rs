@@ -300,28 +300,28 @@ pub fn bishop_relevant_mask(sq: Square) -> Bitboard {
     while f < 6 && r < 6 {
         f += 1;
         r += 1;
-        mask |= Square::new(f, r).to_bitboard();
+        mask |= Square::new(f, r).as_bitboard();
     }
     let mut f = sq.file();
     let mut r = sq.rank();
     while f > 1 && r > 1 {
         f -= 1;
         r -= 1;
-        mask |= Square::new(f, r).to_bitboard();
+        mask |= Square::new(f, r).as_bitboard();
     }
     let mut f = sq.file();
     let mut r = sq.rank();
     while f < 6 && r > 1 {
         f += 1;
         r -= 1;
-        mask |= Square::new(f, r).to_bitboard();
+        mask |= Square::new(f, r).as_bitboard();
     }
     let mut f = sq.file();
     let mut r = sq.rank();
     while f > 1 && r < 6 {
         f -= 1;
         r += 1;
-        mask |= Square::new(f, r).to_bitboard();
+        mask |= Square::new(f, r).as_bitboard();
     }
     mask
 }
@@ -332,23 +332,23 @@ pub fn rook_relevant_mask(sq: Square) -> Bitboard {
     let mut mask = EMPTY;
     while f < 6 {
         f += 1;
-        mask |= Square::new(f, r).to_bitboard();
+        mask |= Square::new(f, r).as_bitboard();
     }
     let mut f = sq.file();
     while f > 1 {
         f -= 1;
-        mask |= Square::new(f, r).to_bitboard();
+        mask |= Square::new(f, r).as_bitboard();
     }
     let f = sq.file();
     let mut r = sq.rank();
     while r > 1 {
         r -= 1;
-        mask |= Square::new(f, r).to_bitboard();
+        mask |= Square::new(f, r).as_bitboard();
     }
     let mut r = sq.rank();
     while r < 6 {
         r += 1;
-        mask |= Square::new(f, r).to_bitboard();
+        mask |= Square::new(f, r).as_bitboard();
     }
     mask
 }
@@ -361,28 +361,28 @@ pub fn bishop_full_attack(sq: Square, occupancy: Bitboard) -> Bitboard {
     while f < 7 && r < 7 && !occupancy.has(Square::new(f, r)) {
         f += 1;
         r += 1;
-        attack |= Square::new(f, r).to_bitboard();
+        attack |= Square::new(f, r).as_bitboard();
     }
     let mut f = sq.file();
     let mut r = sq.rank();
     while f > 0 && r > 0 && !occupancy.has(Square::new(f, r)) {
         f -= 1;
         r -= 1;
-        attack |= Square::new(f, r).to_bitboard();
+        attack |= Square::new(f, r).as_bitboard();
     }
     let mut f = sq.file();
     let mut r = sq.rank();
     while f < 7 && r > 0 && !occupancy.has(Square::new(f, r)) {
         f += 1;
         r -= 1;
-        attack |= Square::new(f, r).to_bitboard();
+        attack |= Square::new(f, r).as_bitboard();
     }
     let mut f = sq.file();
     let mut r = sq.rank();
     while f > 0 && r < 7 && !occupancy.has(Square::new(f, r)) {
         f -= 1;
         r += 1;
-        attack |= Square::new(f, r).to_bitboard();
+        attack |= Square::new(f, r).as_bitboard();
     }
 
     attack
@@ -391,27 +391,27 @@ pub fn bishop_full_attack(sq: Square, occupancy: Bitboard) -> Bitboard {
 pub fn rook_full_attack(sq: Square, occupancy: Bitboard) -> Bitboard {
     let mut attack = EMPTY;
 
-    let mut f: u8 = sq.file();
+    let mut f = sq.file();
     let r = sq.rank();
     while f < 7 && !occupancy.has(Square::new(f, r)) {
         f += 1;
-        attack |= Square::new(f, r).to_bitboard();
+        attack |= Square::new(f, r).as_bitboard();
     }
     let mut f = sq.file();
     while f > 0 && !occupancy.has(Square::new(f, r)) {
         f -= 1;
-        attack |= Square::new(f, r).to_bitboard();
+        attack |= Square::new(f, r).as_bitboard();
     }
     let f = sq.file();
     let mut r = sq.rank();
     while r > 0 && !occupancy.has(Square::new(f, r)) {
         r -= 1;
-        attack |= Square::new(f, r).to_bitboard();
+        attack |= Square::new(f, r).as_bitboard();
     }
     let mut r = sq.rank();
     while r < 7 && !occupancy.has(Square::new(f, r)) {
         r += 1;
-        attack |= Square::new(f, r).to_bitboard();
+        attack |= Square::new(f, r).as_bitboard();
     }
 
     attack

@@ -21,24 +21,32 @@ pub const RANK6: Bitboard = RANK1 << 40;
 pub const RANK7: Bitboard = RANK1 << 48;
 pub const RANK8: Bitboard = RANK1 << 56;
 
+pub const FILEA: Bitboard = 0x0101010101010101;
+pub const FILEH: Bitboard = FILEA << 7;
+
 pub trait BitboardExt {
-    fn set(self, pos: u8) -> Self;
-    fn unset(self, pos: u8) -> Self;
-    fn has(self, pos: u8) -> bool;
+    fn set(self, pos: Square) -> Self;
+    fn unset(self, pos: Square) -> Self;
+    fn has(self, pos: Square) -> bool;
     fn to_string(self) -> String;
+    fn lsb(self) -> Square;
+    fn between(sq1: Square, sq2: Square) -> Self;
+    fn forward<const COLOR: bool>(self) -> Self;
+    fn forward_left<const COLOR: bool>(self) -> Self;
+    fn forward_right<const COLOR: bool>(self) -> Self;
     fn display(self);
 }
 
 impl BitboardExt for u64 {
-    fn set(self, pos: u8) -> Self {
+    fn set(self, pos: Square) -> Self {
         self | (1 << pos)
     }
 
-    fn unset(self, pos: u8) -> Self {
+    fn unset(self, pos: Square) -> Self {
         self & !(1 << pos)
     }
     
-    fn has(self, pos: u8) -> bool {
+    fn has(self, pos: Square) -> bool {
         self & (1 << pos) != 0
     }
 
@@ -59,6 +67,48 @@ impl BitboardExt for u64 {
 
     fn display(self) {
         println!("{}", self.to_string())
+    }
+    
+    fn lsb(self) -> Square {
+        self.trailing_zeros() as Square
+    }
+    
+    fn between(sq1: Square, sq2: Square) -> Self {
+        let mut bb = sq1.as_bitboard();
+        let file_diff= (sq2.file() - sq1.file()).clamp(-1, 1);
+        let rank_diff = (sq2.rank() - sq1.rank()).clamp(-1, 1);
+
+        let mut sq = sq1;
+        while sq != sq2 {
+            sq = Square::new(sq.file() + file_diff, sq.rank() + rank_diff);
+            bb |= sq.as_bitboard();
+        }
+
+        bb
+    }
+    
+    fn forward<const COLOR: bool>(self) -> Self {
+        if COLOR == WHITE {
+            self << 8
+        } else {
+            self >> 8
+        }
+    }
+    
+    fn forward_left<const COLOR: bool>(self) -> Self {
+        if COLOR == WHITE {
+            (self & !FILEA) << 7 
+        } else {
+            (self & !FILEH) >> 7 
+        }
+    }
+    
+    fn forward_right<const COLOR: bool>(self) -> Self {
+        if COLOR == WHITE {
+            (self & !FILEH) << 9 
+        } else {
+            (self & !FILEA) >> 9 
+        }
     }
 }
 

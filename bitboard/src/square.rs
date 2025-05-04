@@ -1,18 +1,18 @@
 use crate::*;
 
-pub const A: u8 = 0;
-pub const B: u8 = 1;
-pub const C: u8 = 2;
-pub const D: u8 = 3;
-pub const E: u8 = 4;
-pub const F: u8 = 5;
-pub const G: u8 = 6;
-pub const H: u8 = 7;
+pub const A: i8 = 0;
+pub const B: i8 = 1;
+pub const C: i8 = 2;
+pub const D: i8 = 3;
+pub const E: i8 = 4;
+pub const F: i8 = 5;
+pub const G: i8 = 6;
+pub const H: i8 = 7;
 
-pub const FILE_LIST: [u8; 8] = [A, B, C, D, E, F, G, H];
-pub const RANK_LIST: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
+pub const FILE_LIST: [i8; 8] = [A, B, C, D, E, F, G, H];
+pub const RANK_LIST: [i8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
 
-pub type Square = u8;
+pub type Square = i8;
 
 pub const A1: Square = square_from_name(A, 1);
 pub const A2: Square = square_from_name(A, 2);
@@ -79,33 +79,37 @@ pub const H6: Square = square_from_name(H, 6);
 pub const H7: Square = square_from_name(H, 7);
 pub const H8: Square = square_from_name(H, 8);
 
-pub const fn square_from_name(file: u8, rank: u8) -> Square {
+pub const fn square_from_name(file: i8, rank: i8) -> Square {
     8*(rank-1) + file
 }
 
 pub trait SquareExt {
-    fn new(file: u8, rank: u8) -> Self;
-    fn file(self) -> u8;
-    fn rank(self) -> u8;
-    fn forward<const COLOR: bool>(self) -> u8;
-    fn to_bitboard(self) -> Bitboard;
+    fn new(file: i8, rank: i8) -> Self;
+    fn file(self) -> i8;
+    fn rank(self) -> i8;
+    fn backward<const COLOR: bool>(self) -> Square;
+    fn forward_left<const COLOR: bool>(self) -> Option<Square>;
+    fn forward_right<const COLOR: bool>(self) -> Option<Square>;
+    fn backward_left<const COLOR: bool>(self) -> Square;
+    fn backward_right<const COLOR: bool>(self) -> Square;
+    fn as_bitboard(self) -> Bitboard;
     fn debug(self) -> String;
 }
 
 impl SquareExt for Square {
-    fn new(file: u8, rank: u8) -> Self {
+    fn new(file: i8, rank: i8) -> Self {
         8*rank+file
     }
 
-    fn to_bitboard(self) -> Bitboard {
+    fn as_bitboard(self) -> Bitboard {
         1 << self
     }
     
-    fn file(self) -> u8 {
+    fn file(self) -> i8 {
         self % 8
     }
     
-    fn rank(self) -> u8 {
+    fn rank(self) -> i8 {
         self / 8
     }
     
@@ -127,11 +131,55 @@ impl SquareExt for Square {
         output
     }
     
-    fn forward<const COLOR: bool>(self) -> u8 {
+    fn backward<const COLOR: bool>(self) -> Square {
         if COLOR == WHITE {
-            self + 8
-        } else {
             self - 8
+        } else {
+            self + 8
+        }
+    }
+    
+    fn backward_left<const COLOR: bool>(self) -> Square {
+        if COLOR == WHITE {
+            self - 7
+        } else {
+            self + 7
+        }
+    }
+    
+    fn backward_right<const COLOR: bool>(self) -> Square {
+        if COLOR == WHITE {
+            self - 9
+        } else {
+            self + 9
+        }
+    }
+    
+    fn forward_left<const COLOR: bool>(self) -> Option<Square> {
+        if COLOR == WHITE {
+            if self.file() != A {
+                Some(self + 7)
+            } else {
+                None
+            }
+        } else if self.file() != H {
+            Some(self - 7)
+        } else {
+            None
+        }
+    }
+    
+    fn forward_right<const COLOR: bool>(self) -> Option<Square> {
+        if COLOR == WHITE {
+            if self.file() != H {
+                Some(self + 9)
+            } else {
+                None
+            }
+        } else if self.file() != A {
+            Some(self - 9)
+        } else {
+            None
         }
     }
 }

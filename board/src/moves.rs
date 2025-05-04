@@ -7,10 +7,10 @@ use crate::consts::*;
 
 #[bitfield(u16, debug=false)]
 pub struct Move {
-    #[bits(6)]
-    pub from: u8,
-    #[bits(6)]
-    pub to: u8,
+    #[bits(6, from = std::convert::identity, into = std::convert::identity)]
+    pub from: i8,
+    #[bits(6, from = std::convert::identity, into = std::convert::identity)]
+    pub to: i8,
     #[bits(4)]
     pub infos: MoveInfo,
 }
@@ -18,14 +18,14 @@ pub struct Move {
 #[bitfield(u32)]
 pub struct ExtendedMove {
     #[bits(16)]
-    base_move: Move,
+    pub base_move: Move,
     #[bits(16)]
-    infos: ExtMoveInfo,
+    pub infos: ExtMoveInfo,
 }
 
 impl Move {
-    pub fn new_base(from: usize, to: usize) -> Self {
-        Self::new().with_from(from as u8).with_to(to as u8)
+    pub fn new_base(from: Square, to: Square) -> Self {
+        Self::new().with_from(from).with_to(to)
     }
 }
 
@@ -43,7 +43,7 @@ pub enum MoveInfo {
 
 #[derive(Debug, PartialEq)]
 pub struct ExtMoveInfo {
-    captured_piece: Option<Piece>,
+    pub captured_piece: Option<Piece>,
 }
 
 #[bitfield(u8)]
