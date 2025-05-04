@@ -20,9 +20,17 @@ pub const RANK5: Bitboard = RANK1 << 32;
 pub const RANK6: Bitboard = RANK1 << 40;
 pub const RANK7: Bitboard = RANK1 << 48;
 pub const RANK8: Bitboard = RANK1 << 56;
+const RANKS: [Bitboard; 8] = [RANK1, RANK2, RANK3, RANK4, RANK5, RANK6, RANK7, RANK8];
 
 pub const FILEA: Bitboard = 0x0101010101010101;
+pub const FILEB: Bitboard = FILEA << 1;
+pub const FILEC: Bitboard = FILEA << 2;
+pub const FILED: Bitboard = FILEA << 3;
+pub const FILEE: Bitboard = FILEA << 4;
+pub const FILEF: Bitboard = FILEA << 5;
+pub const FILEG: Bitboard = FILEA << 6;
 pub const FILEH: Bitboard = FILEA << 7;
+const FILES: [Bitboard; 8] = [FILEA, FILEB, FILEC, FILED, FILEE, FILEF, FILEG, FILEH];
 
 pub trait BitboardExt {
     fn set(self, pos: Square) -> Self;
@@ -31,6 +39,7 @@ pub trait BitboardExt {
     fn to_string(self) -> String;
     fn lsb(self) -> Square;
     fn between(sq1: Square, sq2: Square) -> Self;
+    fn line(sq1: Square, sq2: Square) -> Self;
     fn forward<const COLOR: bool>(self) -> Self;
     fn forward_left<const COLOR: bool>(self) -> Self;
     fn forward_right<const COLOR: bool>(self) -> Self;
@@ -73,18 +82,28 @@ impl BitboardExt for u64 {
         self.trailing_zeros() as Square
     }
     
+    // Bounds are excluded
     fn between(sq1: Square, sq2: Square) -> Self {
-        let mut bb = sq1.as_bitboard();
+        let mut bb = EMPTY;
         let file_diff= (sq2.file() - sq1.file()).clamp(-1, 1);
         let rank_diff = (sq2.rank() - sq1.rank()).clamp(-1, 1);
 
-        let mut sq = sq1;
-        while sq != sq2 {
-            sq = Square::new(sq.file() + file_diff, sq.rank() + rank_diff);
-            bb |= sq.as_bitboard();
+        let mut next_sq = Square::new(sq1.file() + file_diff, sq1.rank() + rank_diff);
+        while next_sq != sq2 {
+            bb |= next_sq.as_bitboard();
+            next_sq = Square::new(next_sq.file() + file_diff, next_sq.rank() + rank_diff);
         }
 
         bb
+    }
+
+    // If the two squares are not on a line, the bitboard is empty
+    fn line(sq1: Square, sq2: Square) -> Self {
+        if sq1.rank() == sq2.rank() {
+            RANKS[sq1.rank() as usize]
+        } else if sq1.file() == sq2.file() {
+            FILES[sq1.rank() as usize]
+        } else { EMPTY }
     }
     
     fn forward<const COLOR: bool>(self) -> Self {

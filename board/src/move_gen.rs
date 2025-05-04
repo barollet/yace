@@ -32,12 +32,31 @@ impl Board {
         rook_attack(sq, occupancy)
     }
 
-    pub fn square_attacked_by<const ATTACK_COLOR: bool>(&self, sq: Square) -> Bitboard {
-        self.bishop_attack(sq) & self.pieces[ATTACK_COLOR] & (self.bitboards[BISHOP] | self.bitboards[QUEEN])
-        | self.rook_attack(sq) & self.pieces[ATTACK_COLOR] & (self.bitboards[ROOK] | self.bitboards[QUEEN])
-        | KNIGHT_ATTACK[sq as usize] & self.pieces[ATTACK_COLOR] & self.bitboards[KNIGHT]
-        | self.pieces[ATTACK_COLOR] & self.bitboards[PAWN] & sq.forward_left::<ATTACK_COLOR>().map_or(EMPTY, Square::as_bitboard)
-        | self.pieces[ATTACK_COLOR] & self.bitboards[PAWN] & sq.forward_right::<ATTACK_COLOR>().map_or(EMPTY, Square::as_bitboard)
+    pub fn square_attacked_by<const MY_COLOR: bool>(&self, sq: Square) -> Bitboard {
+        self.bishop_attack(sq) & self.pieces[!MY_COLOR] & (self.bitboards[BISHOP] | self.bitboards[QUEEN])
+        | self.rook_attack(sq) & self.pieces[!MY_COLOR] & (self.bitboards[ROOK] | self.bitboards[QUEEN])
+        | KNIGHT_ATTACK[sq as usize] & self.pieces[!MY_COLOR] & self.bitboards[KNIGHT]
+        | self.pieces[!MY_COLOR] & self.bitboards[PAWN] & sq.backward_left::<MY_COLOR>().map_or(EMPTY, Square::as_bitboard)
+        | self.pieces[!MY_COLOR] & self.bitboards[PAWN] & sq.backward_right::<MY_COLOR>().map_or(EMPTY, Square::as_bitboard)
+    }
+
+    fn pinned_pieces(&self) -> Bitboard {
+        let king_square = self.king_square(self.to_move);
+        let enemy_pieces = self.pieces[!self.to_move];
+
+        let mut pinned = EMPTY;
+
+        let snipers = rook_attack(king_square, EMPTY) & (self.bitboards[ROOK] | self.bitboards[QUEEN]) & enemy_pieces
+            | bishop_attack(king_square, EMPTY) & (self.bitboards[BISHOP] | self.bitboards[QUEEN]) & enemy_pieces;
+
+        for start_square in BitIter::from(snipers) {
+            let line = Bitboard::between(start_square as Square, king_square) & (self.pieces[WHITE] | self.pieces[BLACK]);
+            if line.count_ones() == 1 {
+                pinned |= line;
+            }
+        }
+
+        pinned
     }
 }
 
@@ -55,7 +74,29 @@ impl<'a> MoveGenerator<'a> {
     }
 
     fn generate<const COLOR: bool>(mut self) -> Vec<Move> {
-        self.pseudo_legal_movegen::<COLOR, NON_EVASION>();
+        let king_square = self.board.king_square(self.board.to_move);
+        if self.board.square_attacked_by::<COLOR>(king_square) != 0 {
+            self.pseudo_legal_movegen::<COLOR, EVASION>();
+        } else {
+            self.pseudo_legal_movegen::<COLOR, NON_EVASION>();
+        }
+
+        self.moves.retain(|m| {
+            // TODO en passant
+            // TODO check castle
+            if self.board.pinned_pieces().has(m.from()) {
+                // if the piece is pinned, the king must be on the line of its movement
+                // if the movement is not a line then the bitboard is empty
+                return Bitboard::line(m.from(), m.to()).has(king_square)
+            }
+
+            if let Some(KING) = self.board.squares[m.from() as usize] {
+                return self.board.square_attacked_by::<COLOR>(m.to()) == EMPTY
+            }
+            
+            true
+        });
+
         self.moves
     }
 
@@ -67,11 +108,11 @@ impl<'a> MoveGenerator<'a> {
         } else if KIND == NON_EVASION {
             !self.board.pieces[COLOR]
         } else { // EVASION
-            Bitboard::between(self.board.king_square(COLOR), self.board.checkers().lsb())
+            Bitboard::between(self.board.king_square(COLOR), self.board.checkers::<COLOR>().lsb())
         };
 
         // If this is not double check we can generate piece moves
-        if !(KIND == EVASION && self.board.checkers().count_ones() > 1) {
+        if !(KIND == EVASION && self.board.checkers::<COLOR>().count_ones() > 1) {
             self.generate_pawn_moves::<COLOR, KIND>(target);
 
             for sq in BitIter::from(self.board.pieces[COLOR]) {
@@ -88,7 +129,6 @@ impl<'a> MoveGenerator<'a> {
             }
         }
 
-        // TODO King moves
         let target = if KIND != EVASION {target} else {!self.board.pieces[COLOR]};
         self.generate_piece_moves::<KING_ORDINAL, COLOR>(self.board.king_square(self.board.to_move), target);
 
@@ -130,10 +170,10 @@ impl<'a> MoveGenerator<'a> {
         // Simple push and double push
         let not_promoting_pawns = pawns & !if COLOR == WHITE {RANK7} else {RANK2};
         let base_rank = if COLOR == WHITE {RANK3} else {RANK6};
-        let push_dest = not_promoting_pawns.forward::<COLOR>() & empty & target;
+        let push_dest = not_promoting_pawns.forward::<COLOR>() & empty;
         let double_push_dest = (push_dest & base_rank).forward::<COLOR>() & empty & target;
         if KIND != CAPTURE {
-            for dest_square in BitIter::from(push_dest) {
+            for dest_square in BitIter::from(push_dest & target) {
                 let dest_square = dest_square as Square;
                 self.moves.push(Move::new_base(dest_square.backward::<COLOR>(), dest_square));
             }
@@ -148,12 +188,12 @@ impl<'a> MoveGenerator<'a> {
         if KIND != QUIET {
             for dest_square in BitIter::from(not_promoting_pawns.forward_left::<COLOR>() & self.board.pieces[!COLOR] & target) {
                 let dest_square = dest_square as Square;
-                self.moves.push(Move::new_base(dest_square.backward_left::<COLOR>(), dest_square as Square).with_infos(MoveInfo::Capture));
+                self.moves.push(Move::new_base(dest_square.backward_left::<COLOR>().unwrap(), dest_square as Square).with_infos(MoveInfo::Capture));
             }
 
             for dest_square in BitIter::from(not_promoting_pawns.forward_right::<COLOR>() & self.board.pieces[!COLOR] & target) {
                 let dest_square = dest_square as Square;
-                self.moves.push(Move::new_base(dest_square.backward_right::<COLOR>(), dest_square as Square).with_infos(MoveInfo::Capture));
+                self.moves.push(Move::new_base(dest_square.backward_right::<COLOR>().unwrap(), dest_square as Square).with_infos(MoveInfo::Capture));
             }
         }
         // TODO Promotion
@@ -267,16 +307,5 @@ mod tests {
         //assert_eq!(perft::<true>(&mut board, 2), 400);
         //assert_eq!(perft::<true>(&mut board, 3), 8_902);
         assert_eq!(perft::<true>(&mut board, 4), 197_281);
-
-
-        return;
-        board.make(Move::new_base(B2, B3));
-        board.make(Move::new_base(E7, E6));
-        board.make(Move::new_base(C1, A3));
-
-        board.display();
-        //assert_eq!(perft::<true>(&mut board, 3), 9345);
-        //assert_eq!(perft::<true>(&mut board, 2), 628);
-        assert_eq!(perft::<true>(&mut board, 1), 29);
     }
 }

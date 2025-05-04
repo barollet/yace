@@ -90,8 +90,8 @@ pub trait SquareExt {
     fn backward<const COLOR: bool>(self) -> Square;
     fn forward_left<const COLOR: bool>(self) -> Option<Square>;
     fn forward_right<const COLOR: bool>(self) -> Option<Square>;
-    fn backward_left<const COLOR: bool>(self) -> Square;
-    fn backward_right<const COLOR: bool>(self) -> Square;
+    fn backward_left<const COLOR: bool>(self) -> Option<Square>;
+    fn backward_right<const COLOR: bool>(self) -> Option<Square>;
     fn as_bitboard(self) -> Bitboard;
     fn debug(self) -> String;
 }
@@ -139,19 +139,31 @@ impl SquareExt for Square {
         }
     }
     
-    fn backward_left<const COLOR: bool>(self) -> Square {
+    fn backward_left<const COLOR: bool>(self) -> Option<Square> {
         if COLOR == WHITE {
-            self - 7
+            if self.file() != H && self.rank() > 0 {
+                Some(self - 7)
+            } else {
+                None
+            }
+        } else if self.file() != A && self.rank() < 7 {
+            Some(self + 7)
         } else {
-            self + 7
+            None
         }
     }
     
-    fn backward_right<const COLOR: bool>(self) -> Square {
+    fn backward_right<const COLOR: bool>(self) -> Option<Square> {
         if COLOR == WHITE {
-            self - 9
+            if self.file() != A && self.rank() > 0 {
+                Some(self - 9)
+            } else {
+                None
+            }
+        } else if self.file() != H && self.rank() < 7 {
+            Some(self + 9)
         } else {
-            self + 9
+            None
         }
     }
     

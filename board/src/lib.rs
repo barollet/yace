@@ -99,12 +99,8 @@ impl Board {
         (self.bitboards[KING] & self.pieces[color]).lsb()
     }
 
-    fn checkers(&self) -> Bitboard {
-        if self.to_move == WHITE {
-            self.square_attacked_by::<BLACK>(self.king_square(WHITE))
-        } else {
-            self.square_attacked_by::<WHITE>(self.king_square(BLACK))
-        }
+    fn checkers<const COLOR: bool>(&self) -> Bitboard {
+        self.square_attacked_by::<COLOR>(self.king_square(COLOR))
     }
 
     pub fn display(&self) {
