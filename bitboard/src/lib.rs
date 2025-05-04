@@ -2,6 +2,11 @@ pub use crate::square::*;
 
 mod square;
 
+pub type Color = bool;
+
+pub const WHITE: Color = false;
+pub const BLACK: Color = true;
+
 pub type Bitboard = u64;
 
 pub const EMPTY: Bitboard = 0;

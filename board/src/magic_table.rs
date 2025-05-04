@@ -153,7 +153,7 @@ pub fn bishop_attack(sq: Square, occupancy: Bitboard) -> Bitboard {
     ATTACK_TABLE[magic.index(occupancy)] & magic.post_mask
 }
 
-pub fn rook_attack(sq:Square, occupancy: Bitboard) -> Bitboard {
+pub fn rook_attack(sq: Square, occupancy: Bitboard) -> Bitboard {
     let magic = &ROOK_MAGIC[sq as usize];
     ATTACK_TABLE[magic.index(occupancy)] & magic.post_mask
 }

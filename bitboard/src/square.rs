@@ -1,4 +1,4 @@
-use crate::Bitboard;
+use crate::*;
 
 pub const A: u8 = 0;
 pub const B: u8 = 1;
@@ -87,6 +87,7 @@ pub trait SquareExt {
     fn new(file: u8, rank: u8) -> Self;
     fn file(self) -> u8;
     fn rank(self) -> u8;
+    fn forward<const COLOR: bool>(self) -> u8;
     fn to_bitboard(self) -> Bitboard;
     fn debug(self) -> String;
 }
@@ -124,5 +125,13 @@ impl SquareExt for Square {
         output.push(char::from_digit(self.rank() as u32+1, 10).expect("Invalid rank for square"));
 
         output
+    }
+    
+    fn forward<const COLOR: bool>(self) -> u8 {
+        if COLOR == WHITE {
+            self + 8
+        } else {
+            self - 8
+        }
     }
 }

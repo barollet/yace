@@ -1,10 +1,5 @@
 use enum_ext::enum_extend;
 
-pub type Color = bool;
-
-pub const WHITE: Color = false;
-pub const BLACK: Color = true;
-
 #[derive(Debug, Copy, PartialEq)]
 #[enum_extend(IntType = "u8")]
 pub enum Piece {
@@ -22,6 +17,13 @@ pub const BISHOP: Piece = Piece::Bishop;
 pub const ROOK: Piece = Piece::Rook;
 pub const QUEEN: Piece = Piece::Queen;
 pub const KING: Piece = Piece::King;
+
+pub const PAWN_ORDINAL: u8 = PAWN.ordinal() as u8;
+pub const KNIGHT_ORDINAL: u8 = KNIGHT.ordinal() as u8;
+pub const BISHOP_ORDINAL: u8 = BISHOP.ordinal() as u8;
+pub const ROOK_ORDINAL: u8 = ROOK.ordinal() as u8;
+pub const QUEEN_ORDINAL: u8 = QUEEN.ordinal() as u8;
+pub const KING_ORDINAL: u8 = KING.ordinal() as u8;
 
 impl From<Piece> for usize {
     fn from(value: Piece) -> Self {

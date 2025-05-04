@@ -15,6 +15,14 @@ pub struct Move {
     pub infos: MoveInfo,
 }
 
+#[bitfield(u32)]
+pub struct ExtendedMove {
+    #[bits(16)]
+    base_move: Move,
+    #[bits(16)]
+    infos: ExtMoveInfo,
+}
+
 impl Move {
     pub fn new_base(from: usize, to: usize) -> Self {
         Self::new().with_from(from as u8).with_to(to as u8)
@@ -31,6 +39,11 @@ pub enum MoveInfo {
     EnPassantCapture,
     Promotion(Piece),
     CapturePromotion(Piece),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ExtMoveInfo {
+    captured_piece: Option<Piece>,
 }
 
 #[bitfield(u8)]
@@ -81,6 +94,27 @@ impl MoveInfo {
                 (true, false) => MoveInfo::KingCastle,
                 (true, true) => MoveInfo::QueenCastle,
             }
+        }
+    }
+}
+
+impl ExtendedMove {
+    pub fn new_base(base_move: Move, captured_piece: Option<Piece>) -> Self {
+        Self::new().with_base_move(base_move).with_infos(ExtMoveInfo { captured_piece })
+    }
+}
+
+impl ExtMoveInfo {
+    const fn from_bits(value: u16) -> Self {
+        Self {
+            captured_piece: Piece::from_u8(value as u8),
+        }
+    }
+    const fn into_bits(self) -> u16 {
+        if let Some(piece) = self.captured_piece {
+            piece.ordinal() as u16
+        } else {
+            0b111
         }
     }
 }
