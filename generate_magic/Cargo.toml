@@ -1,0 +1,8 @@
+[package]
+name = "generate_magic"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bitboard = { path = "../bitboard" }
+rand = "0.9.1"
