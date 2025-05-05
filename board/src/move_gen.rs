@@ -1,12 +1,13 @@
 use std::sync::LazyLock;
 
 use bit_iter::BitIter;
-use bitboard::*;
+use crate::bitboard::*;
 
 use crate::{consts::*, magic_table::{bishop_attack, rook_attack}, moves::*, Board};
 
 static KNIGHT_ATTACK: LazyLock<[Bitboard; 64]> = LazyLock::new(initialize_knight_attack);
 static KING_ATTACK: LazyLock<[Bitboard; 64]> = LazyLock::new(initialize_king_attack);
+static EP_FROM_SQUARES: LazyLock<[Bitboard; 16]> = LazyLock::new(initialize_ep_from_squares);
 
 const QUIET: u8 = 0;
 const CAPTURE: u8 = 1;
@@ -23,21 +24,25 @@ impl Board {
     }
 
     fn bishop_attack(&self, sq: Square) -> Bitboard {
-        let occupancy: u64 = self.pieces[WHITE] | self.pieces[BLACK];
+        let occupancy = self.pieces[WHITE] | self.pieces[BLACK];
         bishop_attack(sq, occupancy)
     }
 
     fn rook_attack(&self, sq: Square) -> Bitboard {
-        let occupancy: u64 = self.pieces[WHITE] | self.pieces[BLACK];
+        let occupancy = self.pieces[WHITE] | self.pieces[BLACK];
         rook_attack(sq, occupancy)
     }
 
     pub fn square_attacked_by<const MY_COLOR: bool>(&self, sq: Square) -> Bitboard {
-        self.bishop_attack(sq) & self.pieces[!MY_COLOR] & (self.bitboards[BISHOP] | self.bitboards[QUEEN])
-        | self.rook_attack(sq) & self.pieces[!MY_COLOR] & (self.bitboards[ROOK] | self.bitboards[QUEEN])
+        self.square_attacked_by_with_occ::<MY_COLOR>(sq, self.pieces[WHITE] | self.pieces[BLACK])
+    }
+
+    fn square_attacked_by_with_occ<const MY_COLOR: bool>(&self, sq: Square, occupancy: Bitboard) -> Bitboard {
+        bishop_attack(sq, occupancy) & self.pieces[!MY_COLOR] & (self.bitboards[BISHOP] | self.bitboards[QUEEN])
+        | rook_attack(sq, occupancy) & self.pieces[!MY_COLOR] & (self.bitboards[ROOK] | self.bitboards[QUEEN])
         | KNIGHT_ATTACK[sq as usize] & self.pieces[!MY_COLOR] & self.bitboards[KNIGHT]
-        | self.pieces[!MY_COLOR] & self.bitboards[PAWN] & sq.backward_left::<MY_COLOR>().map_or(EMPTY, Square::as_bitboard)
-        | self.pieces[!MY_COLOR] & self.bitboards[PAWN] & sq.backward_right::<MY_COLOR>().map_or(EMPTY, Square::as_bitboard)
+        | self.pieces[!MY_COLOR] & self.bitboards[PAWN] & sq.forward_left::<MY_COLOR>().map_or(EMPTY, Square::as_bitboard)
+        | self.pieces[!MY_COLOR] & self.bitboards[PAWN] & sq.forward_right::<MY_COLOR>().map_or(EMPTY, Square::as_bitboard)
     }
 
     fn pinned_pieces(&self) -> Bitboard {
@@ -50,12 +55,12 @@ impl Board {
             | bishop_attack(king_square, EMPTY) & (self.bitboards[BISHOP] | self.bitboards[QUEEN]) & enemy_pieces;
 
         for start_square in BitIter::from(snipers) {
-            let line = Bitboard::between(start_square as Square, king_square) & (self.pieces[WHITE] | self.pieces[BLACK]);
+            let line = Bitboard::between(start_square as Square, king_square).unset(start_square as Square) & (self.pieces[WHITE] | self.pieces[BLACK]);
+
             if line.count_ones() == 1 {
                 pinned |= line;
             }
         }
-
         pinned
     }
 }
@@ -81,17 +86,19 @@ impl<'a> MoveGenerator<'a> {
             self.pseudo_legal_movegen::<COLOR, NON_EVASION>();
         }
 
+        let pinned = self.board.pinned_pieces();
         self.moves.retain(|m| {
             // TODO en passant
             // TODO check castle
-            if self.board.pinned_pieces().has(m.from()) {
+            if pinned.has(m.from()) {
                 // if the piece is pinned, the king must be on the line of its movement
                 // if the movement is not a line then the bitboard is empty
-                return Bitboard::line(m.from(), m.to()).has(king_square)
+                return line(m.from(), m.to()).has(king_square)
             }
 
             if let Some(KING) = self.board.squares[m.from() as usize] {
-                return self.board.square_attacked_by::<COLOR>(m.to()) == EMPTY
+                let occupancy = (self.board.pieces[WHITE] | self.board.pieces[BLACK]).unset(king_square);
+                return self.board.square_attacked_by_with_occ::<COLOR>(m.to(), occupancy) == EMPTY
             }
             
             true
@@ -108,7 +115,8 @@ impl<'a> MoveGenerator<'a> {
         } else if KIND == NON_EVASION {
             !self.board.pieces[COLOR]
         } else { // EVASION
-            Bitboard::between(self.board.king_square(COLOR), self.board.checkers::<COLOR>().lsb())
+            let checker = self.board.checkers::<COLOR>().lsb();
+            Bitboard::between(checker, self.board.king_square(COLOR)).set(checker)
         };
 
         // If this is not double check we can generate piece moves
@@ -195,10 +203,34 @@ impl<'a> MoveGenerator<'a> {
                 let dest_square = dest_square as Square;
                 self.moves.push(Move::new_base(dest_square.backward_right::<COLOR>().unwrap(), dest_square as Square).with_infos(MoveInfo::Capture));
             }
+
+            // En passant
+            if let Some(ep_target) = self.board.ep_target {
+                let ep_dest = ep_target.forward::<COLOR>();
+                if self.board.squares[ep_dest as usize].is_none() && target.has(ep_dest) {
+                    let capturing_pawns = EP_FROM_SQUARES[(ep_target - A4) as usize] & self.board.bitboards[PAWN] & self.board.pieces[COLOR];
+                    for from_square in BitIter::from(capturing_pawns) {
+                        self.moves.push(Move::new_base(from_square as Square, ep_dest).with_infos(MoveInfo::EnPassantCapture));
+                    }
+                }
+            }
         }
+
         // TODO Promotion
-        // TODO EN PASSANT
+
     }
+}
+
+// line is computed with intersection of two bishop attacks
+// If the two squares are not on a line, the bitboard is empty
+fn line(sq1: Square, sq2: Square) -> Bitboard {
+    if sq1.rank() == sq2.rank() {
+        RANKS[sq1.rank() as usize]
+    } else if sq1.file() == sq2.file() {
+        FILES[sq1.file() as usize]
+    } else if (sq1.file() - sq2.file()).abs() == (sq1.rank() - sq2.rank()).abs() {
+        (bishop_attack(sq1, EMPTY) & bishop_attack(sq2, EMPTY)).set(sq1).set(sq2)
+    } else { EMPTY }
 }
 
 fn initialize_knight_attack() -> [Bitboard; 64] {
@@ -275,13 +307,37 @@ fn initialize_king_attack() -> [Bitboard; 64] {
     king_attack
 }
 
+fn initialize_ep_from_squares() -> [Bitboard; 16] {
+    let mut ep_from = [EMPTY; 16];
+    for rank in [4, 5] {
+        for file in FILE_LIST {
+            let square = square_from_name(file, rank);
+            let mut bb = EMPTY;
+            if square.file() != A {
+                bb = bb.set(square-1);
+            }
+            if square.file() != H {
+                bb = bb.set(square+1);
+            }
+            ep_from[(square-A4) as usize] = bb;
+        }
+    }
+    ep_from
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn perft<const IS_ROOT: bool>(board: &mut Board, depth: usize) -> usize {
         if depth == 1 {
-            board.legal_move_gen().len()
+            let moves = board.legal_move_gen();
+            if IS_ROOT {
+                for m in &moves {
+                    println!("{}{}: {}", m.from().debug(), m.to().debug(), 1);
+                }
+            }
+            moves.len()
         } else {
             let mut count = 0;
             for to_play in board.legal_move_gen() {
@@ -303,9 +359,17 @@ mod tests {
     #[test]
     fn perft_base() {
         let mut board = Board::new();
-        //assert_eq!(perft::<true>(&mut board, 1), 20);
-        //assert_eq!(perft::<true>(&mut board, 2), 400);
-        //assert_eq!(perft::<true>(&mut board, 3), 8_902);
+        assert_eq!(perft::<true>(&mut board, 1), 20);
+        assert_eq!(perft::<true>(&mut board, 2), 400);
+        assert_eq!(perft::<true>(&mut board, 3), 8_902);
         assert_eq!(perft::<true>(&mut board, 4), 197_281);
+        assert_eq!(perft::<true>(&mut board, 5), 4_865_609);
+    }
+
+    #[test]
+    #[ignore]
+    fn perft_base_expensive() {
+        let mut board: Board = Board::new();
+        assert_eq!(perft::<true>(&mut board, 6), 119_060_324);
     }
 }

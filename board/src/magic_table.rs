@@ -1,6 +1,6 @@
 use std::{array, sync::LazyLock, fmt::Debug};
 
-use bitboard::*;
+use crate::bitboard::*;
 
 pub struct Magic {
     factor: u64,

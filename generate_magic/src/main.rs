@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use bitboard::*;
+use board::bitboard::*;
 use board::magic_table::*;
 
 use rand::prelude::*;

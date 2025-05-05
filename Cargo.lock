@@ -9,10 +9,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c95b1159d450fcb44b73b8d7b7b739656061483a585bffe4b7484e617bf55e9"
 
 [[package]]
-name = "bitboard"
-version = "0.1.0"
-
-[[package]]
 name = "bitfield-struct"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -34,7 +30,6 @@ name = "board"
 version = "0.1.0"
 dependencies = [
  "bit-iter",
- "bitboard",
  "bitfield-struct",
  "enum_ext",
 ]
@@ -60,7 +55,6 @@ dependencies = [
 name = "generate_magic"
 version = "0.1.0"
 dependencies = [
- "bitboard",
  "board",
  "rand",
 ]

@@ -3,17 +3,20 @@ use consts::*;
 use enum_indexed::*;
 use moves::{ExtendedMove, Move, MoveInfo};
 
+pub mod bitboard;
 mod consts;
 mod enum_indexed;
 pub mod magic_table;
 mod move_gen;
 mod moves;
+mod square;
 
 #[derive(Clone, Debug)]
 pub struct Board {
     pieces: ColorIndexed<Bitboard>,
     bitboards: PieceIndexed<Bitboard>,
     squares: [Option<Piece>; 64],
+    ep_target: Option<Square>,
     to_move: Color,
 }
 
@@ -44,13 +47,16 @@ impl Board {
             pieces,
             bitboards,
             squares,
+            ep_target: None,
             to_move: WHITE,
         }
     }
 
     // Move must be legal
     pub fn make(&mut self, to_play: Move) -> ExtendedMove {
-        // TODO en passant
+        let past_ep_state = self.ep_target;
+
+        // For en passant the captured piece is not set to pawn as we already know it
         let captured_piece = match to_play.infos() {
             MoveInfo::Capture | MoveInfo::CapturePromotion(_) => {
                 Some(self.remove_piece(to_play.to(), !self.to_move))
@@ -58,27 +64,50 @@ impl Board {
             _ => None
         };
 
+        if to_play.infos() == MoveInfo::EnPassantCapture {
+            if self.to_move == WHITE {
+                self.remove_piece(to_play.to().backward::<WHITE>(), BLACK);
+            } else {
+                self.remove_piece(to_play.to().backward::<BLACK>(), WHITE);
+            }
+        }
+
         let piece: Piece = self.remove_piece(to_play.from(), self.to_move);
         self.add_piece(piece, to_play.to(), self.to_move);
 
-        self.to_move = !self.to_move;
-
-        ExtendedMove::new_base(to_play, captured_piece)
-    }
-
-    pub fn unmake(&mut self, ext_move: ExtendedMove) {
-        let piece: Piece = self.remove_piece(ext_move.base_move().to(), !self.to_move);
-        self.add_piece(piece, ext_move.base_move().from(), !self.to_move);
-
-        // TODO en passant
-        match ext_move.base_move().infos() {
-            MoveInfo::Capture | MoveInfo::CapturePromotion(_) => {
-                self.add_piece(ext_move.infos().captured_piece.unwrap(), ext_move.base_move().to(), self.to_move);
-            },
-            _ => {}
+        // Setting ep state on double push
+        if to_play.infos() == MoveInfo::DoublePawnPush {
+            self.ep_target = Some(to_play.to())
+        } else {
+            self.ep_target = None
         }
 
         self.to_move = !self.to_move;
+
+        ExtendedMove::new_base(to_play, captured_piece, past_ep_state)
+    }
+
+    pub fn unmake(&mut self, ext_move: ExtendedMove) {
+        self.to_move = !self.to_move;
+        self.ep_target = ext_move.infos().past_epstate();
+
+        let piece: Piece = self.remove_piece(ext_move.base_move().to(), self.to_move);
+        self.add_piece(piece, ext_move.base_move().from(), self.to_move);
+
+        if ext_move.base_move().infos() == MoveInfo::EnPassantCapture {
+            if self.to_move == WHITE {
+                self.add_piece(PAWN, ext_move.base_move().to().backward::<WHITE>(), BLACK);
+            } else {
+                self.add_piece(PAWN, ext_move.base_move().to().backward::<BLACK>(), WHITE);
+            }
+        }
+
+        match ext_move.base_move().infos() {
+            MoveInfo::Capture | MoveInfo::CapturePromotion(_) => {
+                self.add_piece(ext_move.infos().captured_piece().unwrap(), ext_move.base_move().to(), !self.to_move);
+            },
+            _ => {}
+        }
     }
 
     fn add_piece(&mut self, piece: Piece, sq: Square, color: Color) {

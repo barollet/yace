@@ -87,6 +87,7 @@ pub trait SquareExt {
     fn new(file: i8, rank: i8) -> Self;
     fn file(self) -> i8;
     fn rank(self) -> i8;
+    fn forward<const COLOR: bool>(self) -> Square;
     fn backward<const COLOR: bool>(self) -> Square;
     fn forward_left<const COLOR: bool>(self) -> Option<Square>;
     fn forward_right<const COLOR: bool>(self) -> Option<Square>;
@@ -136,6 +137,14 @@ impl SquareExt for Square {
             self - 8
         } else {
             self + 8
+        }
+    }
+
+    fn forward<const COLOR: bool>(self) -> Square {
+        if COLOR == WHITE {
+            self + 8
+        } else {
+            self - 8
         }
     }
     

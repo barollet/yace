@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use bitboard::*;
+use crate::bitboard::*;
 use bitfield_struct::bitfield;
 
 use crate::consts::*;
@@ -41,9 +41,15 @@ pub enum MoveInfo {
     CapturePromotion(Piece),
 }
 
+#[bitfield(u16, debug=false)]
 #[derive(Debug, PartialEq)]
 pub struct ExtMoveInfo {
+    #[bits(3, from = captured_from_bits, into = captured_into_bits)]
     pub captured_piece: Option<Piece>,
+    #[bits(5, from = ep_from_bits, into = ep_into_bits)]
+    pub past_epstate: Option<Square>,
+    #[bits(8)]
+    __: u8,
 }
 
 #[bitfield(u8)]
@@ -99,15 +105,45 @@ impl MoveInfo {
 }
 
 impl ExtendedMove {
-    pub fn new_base(base_move: Move, captured_piece: Option<Piece>) -> Self {
-        Self::new().with_base_move(base_move).with_infos(ExtMoveInfo { captured_piece })
+    pub fn new_base(base_move: Move, captured_piece: Option<Piece>, ep_state: Option<Square>) -> Self {
+        Self::new().with_base_move(base_move)
+            .with_infos(ExtMoveInfo::new().with_captured_piece(captured_piece).with_past_epstate(ep_state))
     }
 }
 
+const fn captured_from_bits(value: u8) -> Option<Piece> {
+    Piece::from_u8(value &0b111)
+}
+
+const fn captured_into_bits(piece: Option<Piece>) -> u8 {
+    if let Some(piece) = piece {
+        piece.ordinal() as u8
+    } else {
+        0b111
+    }
+}
+
+const fn ep_from_bits(value: i8) -> Option<Square> {
+    if value & 0b10000 != 0 {
+        Some((value & 0b1111) + A4)
+    } else {
+        None
+    }
+}
+
+const fn ep_into_bits(ep: Option<Square>) -> i8 {
+    if let Some(ep) = ep {
+        0b10000 + (ep - A4)
+    } else {
+        0
+    }
+}
+
+/* 
 impl ExtMoveInfo {
     const fn from_bits(value: u16) -> Self {
         Self {
-            captured_piece: Piece::from_u8(value as u8),
+            captured_piece: Piece::from_u8((value &0b111)as u8),
         }
     }
     const fn into_bits(self) -> u16 {
@@ -117,7 +153,7 @@ impl ExtMoveInfo {
             0b111
         }
     }
-}
+}*/
 
 impl Debug for Move {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -127,7 +163,7 @@ impl Debug for Move {
 
 #[cfg(test)]
 mod tests {
-    use bitboard::*;
+    use crate::bitboard::*;
     use crate::consts::*;
 
     use super::*;
