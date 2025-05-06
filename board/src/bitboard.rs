@@ -81,7 +81,7 @@ impl BitboardExt for u64 {
     
     // Bounds are excluded
     fn between(sq1: Square, sq2: Square) -> Self {
-        let mut bb = EMPTY;
+        let mut bb = sq1.as_bitboard();
         let file_diff= sq2.file() - sq1.file();
         let rank_diff = sq2.rank() - sq1.rank();
         if file_diff == 0 || rank_diff == 0 || file_diff.abs() == rank_diff.abs() {

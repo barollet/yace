@@ -178,12 +178,12 @@ impl SquareExt for Square {
     
     fn forward_left<const COLOR: bool>(self) -> Option<Square> {
         if COLOR == WHITE {
-            if self.file() != A {
+            if self.file() != A && self.rank() < 7 {
                 Some(self + 7)
             } else {
                 None
             }
-        } else if self.file() != H {
+        } else if self.file() != H && self.rank() > 0 {
             Some(self - 7)
         } else {
             None
@@ -192,12 +192,12 @@ impl SquareExt for Square {
     
     fn forward_right<const COLOR: bool>(self) -> Option<Square> {
         if COLOR == WHITE {
-            if self.file() != H {
+            if self.file() != H && self.rank() < 7 {
                 Some(self + 9)
             } else {
                 None
             }
-        } else if self.file() != A {
+        } else if self.file() != A && self.rank() > 0 {
             Some(self - 9)
         } else {
             None

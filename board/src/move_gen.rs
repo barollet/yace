@@ -74,7 +74,7 @@ impl<'a> MoveGenerator<'a> {
     fn new(board: &'a Board) -> Self {
         Self {
             board,
-            moves: Vec::with_capacity(20),
+            moves: Vec::with_capacity(32),
         }
     }
 
@@ -88,8 +88,18 @@ impl<'a> MoveGenerator<'a> {
 
         let pinned = self.board.pinned_pieces();
         self.moves.retain(|m| {
-            // TODO en passant
             // TODO check castle
+
+            if m.infos() == MoveInfo::EnPassantCapture {
+                let ep_target = self.board.ep_target.unwrap();
+                let occupancy = (self.board.pieces[WHITE] | self.board.pieces[BLACK]).unset(m.from()).unset(ep_target).set(m.to());
+                // if the attack is made by the en passant target, it doesn't count
+                if self.board.square_attacked_by_with_occ::<COLOR>(king_square, occupancy) != EMPTY 
+                && king_square.forward_left::<COLOR>() != self.board.ep_target && king_square.forward_right::<COLOR>() != self.board.ep_target {
+                    return false
+                }
+            }
+
             if pinned.has(m.from()) {
                 // if the piece is pinned, the king must be on the line of its movement
                 // if the movement is not a line then the bitboard is empty
@@ -116,7 +126,7 @@ impl<'a> MoveGenerator<'a> {
             !self.board.pieces[COLOR]
         } else { // EVASION
             let checker = self.board.checkers::<COLOR>().lsb();
-            Bitboard::between(checker, self.board.king_square(COLOR)).set(checker)
+            Bitboard::between(checker, self.board.king_square(COLOR))
         };
 
         // If this is not double check we can generate piece moves
@@ -207,7 +217,7 @@ impl<'a> MoveGenerator<'a> {
             // En passant
             if let Some(ep_target) = self.board.ep_target {
                 let ep_dest = ep_target.forward::<COLOR>();
-                if self.board.squares[ep_dest as usize].is_none() && target.has(ep_dest) {
+                if self.board.squares[ep_dest as usize].is_none() && (target.has(ep_dest) | target.has(ep_target)) {
                     let capturing_pawns = EP_FROM_SQUARES[(ep_target - A4) as usize] & self.board.bitboards[PAWN] & self.board.pieces[COLOR];
                     for from_square in BitIter::from(capturing_pawns) {
                         self.moves.push(Move::new_base(from_square as Square, ep_dest).with_infos(MoveInfo::EnPassantCapture));
@@ -341,15 +351,12 @@ mod tests {
         } else {
             let mut count = 0;
             for to_play in board.legal_move_gen() {
-                //println!("make {:?}", ext_move);
                 let ext_move = board.make(to_play);
-                //board.display();
                 let local_count = perft::<false>(board, depth-1);
                 if IS_ROOT {
                     println!("{}{}: {}", to_play.from().debug(), to_play.to().debug(), local_count);
                 }
                 count += local_count;
-                //println!("unmake {:?}", ext_move);
                 board.unmake(ext_move);
             }
             count
@@ -371,5 +378,15 @@ mod tests {
     fn perft_base_expensive() {
         let mut board: Board = Board::new();
         assert_eq!(perft::<true>(&mut board, 6), 119_060_324);
+    }
+
+    #[test]
+    fn perft_pos3() {
+        let mut board = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1").expect("Invalid fen");
+        //assert_eq!(perft::<true>(&mut board, 1), 14);
+        //assert_eq!(perft::<true>(&mut board, 2), 191);
+        //assert_eq!(perft::<true>(&mut board, 3), 2_812);
+        //assert_eq!(perft::<true>(&mut board, 4), 43_238);
+        assert_eq!(perft::<true>(&mut board, 5), 674_624);
     }
 }

@@ -6,19 +6,27 @@ use moves::{ExtendedMove, Move, MoveInfo};
 pub mod bitboard;
 mod consts;
 mod enum_indexed;
+pub mod fen;
 pub mod magic_table;
 mod move_gen;
 mod moves;
 mod square;
+
+pub type CastlingRights = u8;
 
 #[derive(Clone, Debug)]
 pub struct Board {
     pieces: ColorIndexed<Bitboard>,
     bitboards: PieceIndexed<Bitboard>,
     squares: [Option<Piece>; 64],
+    castling_rights: CastlingRights,
     ep_target: Option<Square>,
     to_move: Color,
 }
+
+pub type CastlingSide = bool;
+pub const KINGSIDE: CastlingSide = false;
+pub const QUEENSIDE: CastlingSide = true;
 
 impl Board {
     pub fn new() -> Self {
@@ -48,6 +56,18 @@ impl Board {
             bitboards,
             squares,
             ep_target: None,
+            castling_rights: CastlingRights::new(),
+            to_move: WHITE,
+        }
+    }
+
+    pub fn empty() -> Self {
+        Board {
+            pieces: ColorIndexed::new(),
+            bitboards: PieceIndexed::new(),
+            squares: [None; 64],
+            ep_target: None,
+            castling_rights: CastlingRights::new(),
             to_move: WHITE,
         }
     }
@@ -151,8 +171,69 @@ impl Board {
     }
 }
 
+pub trait CastlingRightsExt {
+    fn new() -> Self;
+    fn remove(&mut self, color: Color, side: CastlingSide);
+    fn restore(&mut self, color: Color, side: CastlingSide);
+    fn has(&self, color: Color, side: CastlingSide) -> bool;
+}
+
+impl CastlingRightsExt for CastlingRights {
+    fn new() -> Self {
+        0xf
+    }
+
+    fn remove(&mut self, color: Color, side: CastlingSide) {
+        let mask = 1 << (2*color as u8 + side as u8);
+        *self &= !mask;
+    }
+    
+    fn restore(&mut self, color: Color, side: CastlingSide) {
+        let mask = 1 << (2*color as u8 + side as u8);
+        *self |= mask;
+    }
+    
+    fn has(&self, color: Color, side: CastlingSide) -> bool {
+        let mask = 1 << (2*color as u8 + side as u8);
+        self & mask != 0
+    }
+}
+
 impl Default for Board {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_castle() {
+        let mut castling = CastlingRights::new();
+
+        assert!(castling.has(WHITE, KINGSIDE));
+        assert!(castling.has(WHITE, QUEENSIDE));
+        assert!(castling.has(BLACK, KINGSIDE));
+        assert!(castling.has(BLACK, QUEENSIDE));
+
+        castling.remove(WHITE, QUEENSIDE);
+        assert!(castling.has(WHITE, KINGSIDE));
+        assert!(!castling.has(WHITE, QUEENSIDE));
+        assert!(castling.has(BLACK, KINGSIDE));
+        assert!(castling.has(BLACK, QUEENSIDE));
+
+        castling.remove(BLACK, KINGSIDE);
+        assert!(castling.has(WHITE, KINGSIDE));
+        assert!(!castling.has(WHITE, QUEENSIDE));
+        assert!(!castling.has(BLACK, KINGSIDE));
+        assert!(castling.has(BLACK, QUEENSIDE));
+
+        castling.restore(WHITE, QUEENSIDE);
+        assert!(castling.has(WHITE, KINGSIDE));
+        assert!(castling.has(WHITE, QUEENSIDE));
+        assert!(!castling.has(BLACK, KINGSIDE));
+        assert!(castling.has(BLACK, QUEENSIDE));
     }
 }
