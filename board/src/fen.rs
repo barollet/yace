@@ -8,8 +8,8 @@ impl Board {
         let to_move = parts.next().unwrap();
         let castling = parts.next().unwrap();
         let en_passant = parts.next().unwrap();
-        let _halfmove = parts.next().unwrap();
-        let _fullmove = parts.next().unwrap();
+        //let _halfmove: &str = parts.next().unwrap();
+        //let _fullmove = parts.next().unwrap();
 
         let mut board = Board::empty();
 

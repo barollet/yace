@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::bitboard::*;
+use crate::{bitboard::*, CastlingRights};
 use bitfield_struct::bitfield;
 
 use crate::consts::*;
@@ -48,7 +48,9 @@ pub struct ExtMoveInfo {
     pub captured_piece: Option<Piece>,
     #[bits(5, from = ep_from_bits, into = ep_into_bits)]
     pub past_epstate: Option<Square>,
-    #[bits(8)]
+    #[bits(4, from = std::convert::identity, into = std::convert::identity)]
+    pub past_castle: CastlingRights,
+    #[bits(4)]
     __: u8,
 }
 
@@ -105,9 +107,9 @@ impl MoveInfo {
 }
 
 impl ExtendedMove {
-    pub fn new_base(base_move: Move, captured_piece: Option<Piece>, ep_state: Option<Square>) -> Self {
+    pub fn new_base(base_move: Move, captured_piece: Option<Piece>, ep_state: Option<Square>, castle: CastlingRights) -> Self {
         Self::new().with_base_move(base_move)
-            .with_infos(ExtMoveInfo::new().with_captured_piece(captured_piece).with_past_epstate(ep_state))
+            .with_infos(ExtMoveInfo::new().with_captured_piece(captured_piece).with_past_epstate(ep_state).with_past_castle(castle))
     }
 }
 
@@ -149,6 +151,7 @@ impl Debug for Move {
 mod tests {
     use crate::bitboard::*;
     use crate::consts::*;
+    use crate::*;
 
     use super::*;
 
@@ -177,5 +180,24 @@ mod tests {
         let m = Move::new().with_from(A3).with_to(D7);
         assert_eq!(m.from(), A3);
         assert_eq!(m.to(), D7);
+    }
+
+    #[test]
+    fn test_ext_move() {
+        let mut rights = CastlingRights::new();
+        let ext = ExtendedMove::new().with_infos(ExtMoveInfo::new().with_past_castle(rights));
+        assert_eq!(ext.infos().past_castle(), rights);
+
+        rights.remove(WHITE, QUEENSIDE);
+        let ext = ExtendedMove::new().with_infos(ExtMoveInfo::new().with_past_castle(rights));
+        assert_eq!(ext.infos().past_castle(), rights);
+
+        rights.remove(BLACK, KINGSIDE);
+        let ext = ExtendedMove::new().with_infos(ExtMoveInfo::new().with_past_castle(rights));
+        assert_eq!(ext.infos().past_castle(), rights);
+
+        rights.restore(BLACK, KINGSIDE);
+        let ext = ExtendedMove::new().with_infos(ExtMoveInfo::new().with_past_castle(rights));
+        assert_eq!(ext.infos().past_castle(), rights);
     }
 }

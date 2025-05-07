@@ -1,6 +1,7 @@
 pub use bitboard::*;
 use consts::*;
 use enum_indexed::*;
+use move_gen::{ROOK_CASTLING_DEST, ROOK_CASTLING_START};
 use moves::{ExtendedMove, Move, MoveInfo};
 
 pub mod bitboard;
@@ -75,6 +76,7 @@ impl Board {
     // Move must be legal
     pub fn make(&mut self, to_play: Move) -> ExtendedMove {
         let past_ep_state = self.ep_target;
+        let past_castle = self.castling_rights;
 
         // For en passant the captured piece is not set to pawn as we already know it
         let captured_piece = match to_play.infos() {
@@ -99,6 +101,34 @@ impl Board {
         };
         self.add_piece(new_piece, to_play.to(), self.to_move);
 
+        // Move rook on castling
+        match to_play.infos() {
+            MoveInfo::KingCastle => {
+                let index = CastlingRights::index(self.to_move, KINGSIDE);
+                self.move_piece(ROOK_CASTLING_START[index], ROOK_CASTLING_DEST[index], self.to_move);
+            },
+            MoveInfo::QueenCastle => {
+                let index = CastlingRights::index(self.to_move, QUEENSIDE);
+                self.move_piece(ROOK_CASTLING_START[index], ROOK_CASTLING_DEST[index], self.to_move);
+            },
+            _ => (),
+        }
+        
+        // If king moves both castling rights are removed, only one if this is a rook
+        // A rook being captured removes the castling right
+        if self.squares[to_play.to() as usize] == Some(KING) {
+            self.castling_rights.remove(self.to_move, KINGSIDE);
+            self.castling_rights.remove(self.to_move, QUEENSIDE);
+        } else if to_play.from() == ROOK_CASTLING_START[CastlingRights::index(self.to_move, KINGSIDE)] {
+            self.castling_rights.remove(self.to_move, KINGSIDE);
+        } else if to_play.from() == ROOK_CASTLING_START[CastlingRights::index(self.to_move, QUEENSIDE)] {
+            self.castling_rights.remove(self.to_move, QUEENSIDE);
+        } else if to_play.to() == ROOK_CASTLING_START[CastlingRights::index(!self.to_move, KINGSIDE)] {
+            self.castling_rights.remove(!self.to_move, KINGSIDE);
+        } else if to_play.to() == ROOK_CASTLING_START[CastlingRights::index(!self.to_move, QUEENSIDE)] {
+            self.castling_rights.remove(!self.to_move, QUEENSIDE);
+        }
+
         // Setting ep state on double push
         if to_play.infos() == MoveInfo::DoublePawnPush {
             self.ep_target = Some(to_play.to())
@@ -108,12 +138,26 @@ impl Board {
 
         self.to_move = !self.to_move;
 
-        ExtendedMove::new_base(to_play, captured_piece, past_ep_state)
+        ExtendedMove::new_base(to_play, captured_piece, past_ep_state, past_castle)
     }
 
     pub fn unmake(&mut self, ext_move: ExtendedMove) {
         self.to_move = !self.to_move;
         self.ep_target = ext_move.infos().past_epstate();
+        self.castling_rights = ext_move.infos().past_castle();
+
+        // Restore old rook position on castle
+        match ext_move.base_move().infos() {
+            MoveInfo::KingCastle => {
+                let index = CastlingRights::index(self.to_move, KINGSIDE);
+                self.move_piece(ROOK_CASTLING_DEST[index], ROOK_CASTLING_START[index], self.to_move);
+            },
+            MoveInfo::QueenCastle => {
+                let index = CastlingRights::index(self.to_move, QUEENSIDE);
+                self.move_piece(ROOK_CASTLING_DEST[index], ROOK_CASTLING_START[index], self.to_move);
+            },
+            _ => (),
+        }
 
         let actual_piece: Piece = self.remove_piece(ext_move.base_move().to(), self.to_move);
         let prev_piece = match ext_move.base_move().infos() {
@@ -152,6 +196,11 @@ impl Board {
         piece
     }
 
+    fn move_piece(&mut self, from: Square, to: Square, color: Color) {
+        let piece = self.remove_piece(from, color);
+        self.add_piece(piece, to, color);
+    }
+
     fn king_square(&self, color: Color) -> Square {
         (self.bitboards[KING] & self.pieces[color]).lsb()
     }
@@ -181,7 +230,7 @@ impl Board {
 
 pub trait CastlingRightsExt {
     fn new() -> Self;
-    fn index(&self, color: Color, side: CastlingSide) -> usize;
+    fn index(color: Color, side: CastlingSide) -> usize;
     fn remove(&mut self, color: Color, side: CastlingSide);
     fn restore(&mut self, color: Color, side: CastlingSide);
     fn has(&self, color: Color, side: CastlingSide) -> bool;
@@ -193,21 +242,21 @@ impl CastlingRightsExt for CastlingRights {
     }
 
     fn remove(&mut self, color: Color, side: CastlingSide) {
-        let mask = 1 << self.index(color, side);
+        let mask = 1 << Self::index(color, side);
         *self &= !mask;
     }
     
     fn restore(&mut self, color: Color, side: CastlingSide) {
-        let mask = 1 << self.index(color, side);
+        let mask = 1 << Self::index(color, side);
         *self |= mask;
     }
     
     fn has(&self, color: Color, side: CastlingSide) -> bool {
-        let mask = 1 << self.index(color, side);
+        let mask = 1 << Self::index(color, side);
         self & mask != 0
     }
     
-    fn index(&self, color: Color, side: CastlingSide) -> usize {
+    fn index(color: Color, side: CastlingSide) -> usize {
         2*color as usize + side as usize
     }
 }
