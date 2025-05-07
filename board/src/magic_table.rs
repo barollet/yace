@@ -12,7 +12,7 @@ pub struct Magic {
 
 static ROOK_MAGIC: LazyLock<[Magic; 64]> = LazyLock::new(build_rook_magic);
 static BISHOP_MAGIC: LazyLock<[Magic; 64]> = LazyLock::new(build_bishop_magic);
-static ATTACK_TABLE: LazyLock<[Bitboard; TOTAL_TABLE_SIZE]> = LazyLock::new(build_magic_table);
+static ATTACK_TABLE: LazyLock<Vec<Bitboard>> = LazyLock::new(build_magic_table);
 
 const BISHOP_FACTORS: [u64; 64] = [
     0x0070cc1000420022,
@@ -162,7 +162,7 @@ impl Magic {
     pub fn new(factor: u64, nbits: u32, pre_mask: Bitboard, post_mask: Bitboard, offset: usize) -> Self {
         Self { factor, shift: 64 - nbits as u8, pre_mask, post_mask, offset }
     }
-    pub fn index(&self, occupancy: Bitboard) -> usize {
+    pub const fn index(&self, occupancy: Bitboard) -> usize {
         self.offset + ((occupancy & self.pre_mask).overflowing_mul(self.factor).0 >> self.shift) as usize
     }
 }
@@ -281,8 +281,8 @@ macro_rules! fill_attack {
     };
 }
 
-fn build_magic_table() -> [Bitboard; TOTAL_TABLE_SIZE] {
-    let mut magic_table = [EMPTY; TOTAL_TABLE_SIZE];
+fn build_magic_table() -> Vec<Bitboard> {
+    let mut magic_table = Vec::from([EMPTY; TOTAL_TABLE_SIZE]);
 
     // rooks
     fill_attack!(magic_table, rook_relevant_mask, rook_full_attack, ROOK_MAGIC);

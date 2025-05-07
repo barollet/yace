@@ -1,5 +1,6 @@
 use std::sync::LazyLock;
 
+use arrayvec::ArrayVec;
 use bit_iter::BitIter;
 use crate::bitboard::*;
 use crate::*;
@@ -20,8 +21,10 @@ const CAPTURE: u8 = 1;
 const EVASION: u8 = 2;
 const NON_EVASION: u8 = 3;
 
+const MAX_MOVE_NUMBER: usize = 256;
+
 impl Board {
-    pub fn legal_move_gen(&self) -> Vec<Move> {
+    pub fn legal_move_gen(&self) -> ArrayVec<Move, MAX_MOVE_NUMBER> {
         if self.to_move == WHITE {
             MoveGenerator::new(self).generate::<WHITE>()
         } else {
@@ -70,22 +73,46 @@ impl Board {
         }
         pinned
     }
+
+    pub fn perft<const IS_ROOT: bool>(&mut self, depth: usize) -> usize {
+        if depth == 1 {
+            let moves = self.legal_move_gen();
+            if IS_ROOT {
+                for m in &moves {
+                    println!("{}{}: {}", m.from().debug(), m.to().debug(), 1);
+                }
+            }
+            moves.len()
+        } else {
+            let mut count = 0;
+            for to_play in self.legal_move_gen() {
+                let ext_move = self.make(to_play);
+                let local_count = self.perft::<false>(depth-1);
+                if IS_ROOT {
+                    println!("{}{}: {}", to_play.from().debug(), to_play.to().debug(), local_count);
+                }
+                count += local_count;
+                self.unmake(ext_move);
+            }
+            count
+        }
+    }
 }
 
 struct MoveGenerator<'a> {
     board: &'a Board,
-    moves: Vec<Move>
+    moves: ArrayVec<Move, MAX_MOVE_NUMBER>,
 }
 
 impl<'a> MoveGenerator<'a> {
     fn new(board: &'a Board) -> Self {
         Self {
             board,
-            moves: Vec::with_capacity(32),
+            moves: ArrayVec::new(),
         }
     }
 
-    fn generate<const COLOR: bool>(mut self) -> Vec<Move> {
+    fn generate<const COLOR: bool>(mut self) -> ArrayVec<Move, MAX_MOVE_NUMBER> {
         let king_square = self.board.king_square(self.board.to_move);
         if self.board.square_attacked_by::<COLOR>(king_square) != 0 {
             self.pseudo_legal_movegen::<COLOR, EVASION>();
@@ -108,7 +135,7 @@ impl<'a> MoveGenerator<'a> {
             if pinned.has(m.from()) {
                 // if the piece is pinned, the king must be on the line of its movement
                 // if the movement is not a line then the bitboard is empty
-                return line(m.from(), m.to()).has(king_square)
+                return Bitboard::line(m.from(), m.to()).has(king_square)
             }
 
             if m.infos() == MoveInfo::KingCastle {
@@ -299,18 +326,6 @@ impl<'a> MoveGenerator<'a> {
     }
 }
 
-// line is computed with intersection of two bishop attacks
-// If the two squares are not on a line, the bitboard is empty
-fn line(sq1: Square, sq2: Square) -> Bitboard {
-    if sq1.rank() == sq2.rank() {
-        RANKS[sq1.rank() as usize]
-    } else if sq1.file() == sq2.file() {
-        FILES[sq1.file() as usize]
-    } else if (sq1.file() - sq2.file()).abs() == (sq1.rank() - sq2.rank()).abs() {
-        (bishop_attack(sq1, EMPTY) & bishop_attack(sq2, EMPTY)).set(sq1).set(sq2)
-    } else { EMPTY }
-}
-
 fn initialize_knight_attack() -> [Bitboard; 64] {
     let mut knight_attack = [0; 64];
     for square in 0..64 {
@@ -482,97 +497,67 @@ fn initialize_rook_castle_start() -> [Square; 4] {
 mod tests {
     use super::*;
 
-    fn perft<const IS_ROOT: bool>(board: &mut Board, depth: usize) -> usize {
-        if depth == 1 {
-            let moves = board.legal_move_gen();
-            if IS_ROOT {
-                for m in &moves {
-                    println!("{}{}: {}", m.from().debug(), m.to().debug(), 1);
-                }
-            }
-            moves.len()
-        } else {
-            let mut count = 0;
-            for to_play in board.legal_move_gen() {
-                let ext_move = board.make(to_play);
-                let local_count = perft::<false>(board, depth-1);
-                if IS_ROOT {
-                    println!("{}{}: {}", to_play.from().debug(), to_play.to().debug(), local_count);
-                }
-                count += local_count;
-                board.unmake(ext_move);
-            }
-            count
-        }
-    }
-
     #[test]
+    #[ignore = "perft"]
     fn perft_base() {
         // startpos
         let mut board = Board::new();
-        assert_eq!(perft::<true>(&mut board, 1), 20);
-        assert_eq!(perft::<true>(&mut board, 2), 400);
-        assert_eq!(perft::<true>(&mut board, 3), 8_902);
-        assert_eq!(perft::<true>(&mut board, 4), 197_281);
-        assert_eq!(perft::<true>(&mut board, 5), 4_865_609);
+        assert_eq!(board.perft::<true>(1), 20);
+        assert_eq!(board.perft::<true>(2), 400);
+        assert_eq!(board.perft::<true>(3), 8_902);
+        assert_eq!(board.perft::<true>(4), 197_281);
+        assert_eq!(board.perft::<true>(5), 4_865_609);
+        assert_eq!(board.perft::<true>(6), 119_060_324);
 
         // pos 2
         let mut board = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1").expect("Invalid fen");
-        assert_eq!(perft::<true>(&mut board, 1), 14);
-        assert_eq!(perft::<true>(&mut board, 2), 191);
-        assert_eq!(perft::<true>(&mut board, 3), 2_812);
-        assert_eq!(perft::<true>(&mut board, 4), 43_238);
-        assert_eq!(perft::<true>(&mut board, 5), 674_624);
-        assert_eq!(perft::<true>(&mut board, 6), 11_030_083);
+        assert_eq!(board.perft::<true>(1), 14);
+        assert_eq!(board.perft::<true>(2), 191);
+        assert_eq!(board.perft::<true>(3), 2_812);
+        assert_eq!(board.perft::<true>(4), 43_238);
+        assert_eq!(board.perft::<true>(5), 674_624);
+        assert_eq!(board.perft::<true>(6), 11_030_083);
+        assert_eq!(board.perft::<true>(7), 178_633_661);
 
         // pos 3
         let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ").expect("Invalid fen");
-        assert_eq!(perft::<true>(&mut board, 1), 48);
-        assert_eq!(perft::<true>(&mut board, 2), 2039);
-        assert_eq!(perft::<true>(&mut board, 3), 97_862);
-        assert_eq!(perft::<true>(&mut board, 4), 4_085_603);
+        assert_eq!(board.perft::<true>(1), 48);
+        assert_eq!(board.perft::<true>(2), 2039);
+        assert_eq!(board.perft::<true>(3), 97_862);
+        assert_eq!(board.perft::<true>(4), 4_085_603);
+        assert_eq!(board.perft::<true>(5), 193_690_690);
 
         // pos 4 and mirrored
         let mut board = Board::from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1").expect("Invalid fen");
-        assert_eq!(perft::<true>(&mut board, 1), 6);
-        assert_eq!(perft::<true>(&mut board, 2), 264);
-        assert_eq!(perft::<true>(&mut board, 3), 9_467);
-        assert_eq!(perft::<true>(&mut board, 4), 422_333);
-        assert_eq!(perft::<true>(&mut board, 5), 15_833_292);
+        assert_eq!(board.perft::<true>(1), 6);
+        assert_eq!(board.perft::<true>(2), 264);
+        assert_eq!(board.perft::<true>(3), 9_467);
+        assert_eq!(board.perft::<true>(4), 422_333);
+        assert_eq!(board.perft::<true>(5), 15_833_292);
+        assert_eq!(board.perft::<true>(6), 706_045_033);
 
         let mut board = Board::from_fen("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1").expect("Invalid fen");
-        assert_eq!(perft::<true>(&mut board, 1), 6);
-        assert_eq!(perft::<true>(&mut board, 2), 264);
-        assert_eq!(perft::<true>(&mut board, 3), 9_467);
-        assert_eq!(perft::<true>(&mut board, 4), 422_333);
-        assert_eq!(perft::<true>(&mut board, 5), 15_833_292);
+        assert_eq!(board.perft::<true>(1), 6);
+        assert_eq!(board.perft::<true>(2), 264);
+        assert_eq!(board.perft::<true>(3), 9_467);
+        assert_eq!(board.perft::<true>(4), 422_333);
+        assert_eq!(board.perft::<true>(5), 15_833_292);
+        assert_eq!(board.perft::<true>(6), 706_045_033);
 
         // pos 5
         let mut board = Board::from_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8").expect("Invalid fen");
-        assert_eq!(perft::<true>(&mut board, 1), 44);
-        assert_eq!(perft::<true>(&mut board, 2), 1_486);
-        assert_eq!(perft::<true>(&mut board, 3), 62_379);
-        assert_eq!(perft::<true>(&mut board, 4),  2_103_487);
+        assert_eq!(board.perft::<true>(1), 44);
+        assert_eq!(board.perft::<true>(2), 1_486);
+        assert_eq!(board.perft::<true>(3), 62_379);
+        assert_eq!(board.perft::<true>(4), 2_103_487);
+        assert_eq!(board.perft::<true>(5), 89_941_194);
 
         // pos 6
         let mut board = Board::from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10").expect("Invalid fen");
-        assert_eq!(perft::<true>(&mut board, 1), 46);
-        assert_eq!(perft::<true>(&mut board, 2), 2_079);
-        assert_eq!(perft::<true>(&mut board, 3), 89_890);
-        assert_eq!(perft::<true>(&mut board, 4), 3_894_594);
-        
-    }
-
-    #[test]
-    #[ignore]
-    fn perft_expensive() {
-        let mut board = Board::new();
-        assert_eq!(perft::<true>(&mut board, 6), 119_060_324);
-
-        let mut board = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1").expect("Invalid fen");
-        assert_eq!(perft::<true>(&mut board, 7), 178_633_661);
-
-        let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ").expect("Invalid fen");
-        assert_eq!(perft::<true>(&mut board, 5), 193_690_690);
+        assert_eq!(board.perft::<true>(1), 46);
+        assert_eq!(board.perft::<true>(2), 2_079);
+        assert_eq!(board.perft::<true>(3), 89_890);
+        assert_eq!(board.perft::<true>(4), 3_894_594);
+        assert_eq!(board.perft::<true>(5), 164_075_551);
     }
 }

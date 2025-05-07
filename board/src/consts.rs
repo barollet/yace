@@ -18,7 +18,6 @@ pub const ROOK: Piece = Piece::Rook;
 pub const QUEEN: Piece = Piece::Queen;
 pub const KING: Piece = Piece::King;
 
-pub const PAWN_ORDINAL: u8 = PAWN.ordinal() as u8;
 pub const KNIGHT_ORDINAL: u8 = KNIGHT.ordinal() as u8;
 pub const BISHOP_ORDINAL: u8 = BISHOP.ordinal() as u8;
 pub const ROOK_ORDINAL: u8 = ROOK.ordinal() as u8;

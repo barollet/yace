@@ -1,3 +1,4 @@
+use crate::magic_table::bishop_attack;
 pub use crate::square::*;
 
 pub type Color = bool;
@@ -37,6 +38,7 @@ pub trait BitboardExt {
     fn to_string(self) -> String;
     fn lsb(self) -> Square;
     fn between(sq1: Square, sq2: Square) -> Self;
+    fn line(sq1: Square, sq2: Square) -> Self;
     fn forward<const COLOR: bool>(self) -> Self;
     fn forward_left<const COLOR: bool>(self) -> Self;
     fn forward_right<const COLOR: bool>(self) -> Self;
@@ -96,6 +98,18 @@ impl BitboardExt for u64 {
         }
 
         bb
+    }
+
+    // line is computed with intersection of two bishop attacks
+    // If the two squares are not on a line, the bitboard is empty
+    fn line(sq1: Square, sq2: Square) -> Self {
+        if sq1.rank() == sq2.rank() {
+            RANKS[sq1.rank() as usize]
+        } else if sq1.file() == sq2.file() {
+            FILES[sq1.file() as usize]
+        } else if (sq1.file() - sq2.file()).abs() == (sq1.rank() - sq2.rank()).abs() {
+            (bishop_attack(sq1, EMPTY) & bishop_attack(sq2, EMPTY)).set(sq1).set(sq2)
+        } else { EMPTY }
     }
     
     fn forward<const COLOR: bool>(self) -> Self {

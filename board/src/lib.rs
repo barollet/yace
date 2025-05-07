@@ -81,6 +81,13 @@ impl Board {
         // For en passant the captured piece is not set to pawn as we already know it
         let captured_piece = match to_play.infos() {
             MoveInfo::Capture | MoveInfo::CapturePromotion(_) => {
+                // remove castling rights if ending on a rook starting square
+                if to_play.to() == ROOK_CASTLING_START[CastlingRights::index(!self.to_move, KINGSIDE)] {
+                    self.castling_rights.remove(!self.to_move, KINGSIDE);
+                } else if to_play.to() == ROOK_CASTLING_START[CastlingRights::index(!self.to_move, QUEENSIDE)] {
+                    self.castling_rights.remove(!self.to_move, QUEENSIDE);
+                }
+
                 Some(self.remove_piece(to_play.to(), !self.to_move))
             },
             _ => None
@@ -123,10 +130,6 @@ impl Board {
             self.castling_rights.remove(self.to_move, KINGSIDE);
         } else if to_play.from() == ROOK_CASTLING_START[CastlingRights::index(self.to_move, QUEENSIDE)] {
             self.castling_rights.remove(self.to_move, QUEENSIDE);
-        } else if to_play.to() == ROOK_CASTLING_START[CastlingRights::index(!self.to_move, KINGSIDE)] {
-            self.castling_rights.remove(!self.to_move, KINGSIDE);
-        } else if to_play.to() == ROOK_CASTLING_START[CastlingRights::index(!self.to_move, QUEENSIDE)] {
-            self.castling_rights.remove(!self.to_move, QUEENSIDE);
         }
 
         // Setting ep state on double push
@@ -256,6 +259,7 @@ impl CastlingRightsExt for CastlingRights {
         self & mask != 0
     }
     
+    #[inline]
     fn index(color: Color, side: CastlingSide) -> usize {
         2*color as usize + side as usize
     }
