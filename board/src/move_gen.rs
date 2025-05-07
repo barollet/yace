@@ -41,6 +41,7 @@ impl Board {
         bishop_attack(sq, occupancy) & self.pieces[!MY_COLOR] & (self.bitboards[BISHOP] | self.bitboards[QUEEN])
         | rook_attack(sq, occupancy) & self.pieces[!MY_COLOR] & (self.bitboards[ROOK] | self.bitboards[QUEEN])
         | KNIGHT_ATTACK[sq as usize] & self.pieces[!MY_COLOR] & self.bitboards[KNIGHT]
+        | KING_ATTACK[sq as usize] & self.pieces[!MY_COLOR] & self.bitboards[KING]
         | self.pieces[!MY_COLOR] & self.bitboards[PAWN] & sq.forward_left::<MY_COLOR>().map_or(EMPTY, Square::as_bitboard)
         | self.pieces[!MY_COLOR] & self.bitboards[PAWN] & sq.forward_right::<MY_COLOR>().map_or(EMPTY, Square::as_bitboard)
     }
@@ -185,35 +186,31 @@ impl<'a> MoveGenerator<'a> {
         let empty = !(self.board.pieces[COLOR] | self.board.pieces[!COLOR]);
         let pawns = self.board.bitboards[PAWN] & self.board.pieces[COLOR];
 
-        // Simple push and double push
-        let not_promoting_pawns = pawns & !if COLOR == WHITE {RANK7} else {RANK2};
-        let base_rank = if COLOR == WHITE {RANK3} else {RANK6};
-        let push_dest = not_promoting_pawns.forward::<COLOR>() & empty;
-        let double_push_dest = (push_dest & base_rank).forward::<COLOR>() & empty & target;
-        if KIND != CAPTURE {
-            for dest_square in BitIter::from(push_dest & target) {
-                let dest_square = dest_square as Square;
-                self.moves.push(Move::new_base(dest_square.backward::<COLOR>(), dest_square));
-            }
-
-            for dest_square in BitIter::from(double_push_dest) {
-                let dest_square = dest_square as Square;
-                self.moves.push(Move::new_base(dest_square.backward::<COLOR>().backward::<COLOR>(), dest_square).with_infos(MoveInfo::DoublePawnPush));
-            }
-        } 
-
-        // Simple capture
+        let promotion_rank = if COLOR == WHITE {RANK8} else {RANK1};
+        
+        // Captures
         if KIND != QUIET {
-            for dest_square in BitIter::from(not_promoting_pawns.forward_left::<COLOR>() & self.board.pieces[!COLOR] & target) {
+            // Simple capture + promotion capture
+            for dest_square in BitIter::from(pawns.forward_left::<COLOR>() & self.board.pieces[!COLOR] & target) {
                 let dest_square = dest_square as Square;
-                self.moves.push(Move::new_base(dest_square.backward_left::<COLOR>().unwrap(), dest_square as Square).with_infos(MoveInfo::Capture));
+                let from_square = dest_square.backward_left::<COLOR>().unwrap();
+                if promotion_rank.has(dest_square) {
+                    self.make_promotion::<KIND, true>(from_square, dest_square);
+                } else {
+                    self.moves.push(Move::new_base(from_square, dest_square as Square).with_infos(MoveInfo::Capture));
+                }
             }
-
-            for dest_square in BitIter::from(not_promoting_pawns.forward_right::<COLOR>() & self.board.pieces[!COLOR] & target) {
+            
+            for dest_square in BitIter::from(pawns.forward_right::<COLOR>() & self.board.pieces[!COLOR] & target) {
                 let dest_square = dest_square as Square;
-                self.moves.push(Move::new_base(dest_square.backward_right::<COLOR>().unwrap(), dest_square as Square).with_infos(MoveInfo::Capture));
+                let from_square = dest_square.backward_right::<COLOR>().unwrap();
+                if promotion_rank.has(dest_square) {
+                    self.make_promotion::<KIND, true>(from_square, dest_square);
+                } else {
+                    self.moves.push(Move::new_base(from_square, dest_square as Square).with_infos(MoveInfo::Capture));
+                }
             }
-
+            
             // En passant
             if let Some(ep_target) = self.board.ep_target {
                 let ep_dest = ep_target.forward::<COLOR>();
@@ -226,8 +223,49 @@ impl<'a> MoveGenerator<'a> {
             }
         }
 
-        // TODO Promotion
+        // Simple push and double push
+        let base_rank = if COLOR == WHITE {RANK3} else {RANK6};
+        let push_dest = pawns.forward::<COLOR>() & empty;
+        let double_push_dest = (push_dest & base_rank).forward::<COLOR>() & empty & target;
 
+        if KIND != CAPTURE {
+            // simple
+            for dest_square in BitIter::from(push_dest & target) {
+                let dest_square = dest_square as Square;
+                let from_square = dest_square.backward::<COLOR>();
+                if promotion_rank.has(dest_square) {
+                    self.make_promotion::<KIND, false>(from_square, dest_square);
+                } else {
+                    self.moves.push(Move::new_base(from_square, dest_square));
+                }
+            }
+    
+            // double
+            for dest_square in BitIter::from(double_push_dest) {
+                let dest_square = dest_square as Square;
+                self.moves.push(Move::new_base(dest_square.backward::<COLOR>().backward::<COLOR>(), dest_square).with_infos(MoveInfo::DoublePawnPush));
+            }
+        }
+    }
+    
+    fn make_promotion<const KIND: u8, const CAPTURING: bool>(&mut self, from: Square, to: Square) {
+        if KIND != QUIET {
+            if CAPTURING {
+                self.moves.push(Move::new_base(from, to).with_infos(MoveInfo::CapturePromotion(QUEEN)));
+            } else {
+                self.moves.push(Move::new_base(from, to).with_infos(MoveInfo::Promotion(QUEEN)));
+            }
+        }
+
+        if KIND != CAPTURE {
+            for piece in [KNIGHT, BISHOP, ROOK] {
+                if CAPTURING {
+                    self.moves.push(Move::new_base(from, to).with_infos(MoveInfo::CapturePromotion(piece)));
+                } else {
+                    self.moves.push(Move::new_base(from, to).with_infos(MoveInfo::Promotion(piece)));
+                }
+            }
+        }
     }
 }
 
@@ -371,22 +409,23 @@ mod tests {
         assert_eq!(perft::<true>(&mut board, 3), 8_902);
         assert_eq!(perft::<true>(&mut board, 4), 197_281);
         assert_eq!(perft::<true>(&mut board, 5), 4_865_609);
+
+        let mut board = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1").expect("Invalid fen");
+        assert_eq!(perft::<true>(&mut board, 1), 14);
+        assert_eq!(perft::<true>(&mut board, 2), 191);
+        assert_eq!(perft::<true>(&mut board, 3), 2_812);
+        assert_eq!(perft::<true>(&mut board, 4), 43_238);
+        assert_eq!(perft::<true>(&mut board, 5), 674_624);
+        assert_eq!(perft::<true>(&mut board, 6), 11_030_083);
     }
 
     #[test]
     #[ignore]
-    fn perft_base_expensive() {
+    fn perft_expensive() {
         let mut board: Board = Board::new();
         assert_eq!(perft::<true>(&mut board, 6), 119_060_324);
-    }
 
-    #[test]
-    fn perft_pos3() {
         let mut board = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1").expect("Invalid fen");
-        //assert_eq!(perft::<true>(&mut board, 1), 14);
-        //assert_eq!(perft::<true>(&mut board, 2), 191);
-        //assert_eq!(perft::<true>(&mut board, 3), 2_812);
-        //assert_eq!(perft::<true>(&mut board, 4), 43_238);
-        assert_eq!(perft::<true>(&mut board, 5), 674_624);
+        assert_eq!(perft::<true>(&mut board, 7), 178_633_661);
     }
 }

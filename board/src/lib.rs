@@ -92,8 +92,12 @@ impl Board {
             }
         }
 
-        let piece: Piece = self.remove_piece(to_play.from(), self.to_move);
-        self.add_piece(piece, to_play.to(), self.to_move);
+        let rem_piece = self.remove_piece(to_play.from(), self.to_move);
+        let new_piece = match to_play.infos() {
+            MoveInfo::Promotion(prom_piece) | MoveInfo::CapturePromotion(prom_piece) => prom_piece,
+            _ => rem_piece
+        };
+        self.add_piece(new_piece, to_play.to(), self.to_move);
 
         // Setting ep state on double push
         if to_play.infos() == MoveInfo::DoublePawnPush {
@@ -111,8 +115,12 @@ impl Board {
         self.to_move = !self.to_move;
         self.ep_target = ext_move.infos().past_epstate();
 
-        let piece: Piece = self.remove_piece(ext_move.base_move().to(), self.to_move);
-        self.add_piece(piece, ext_move.base_move().from(), self.to_move);
+        let actual_piece: Piece = self.remove_piece(ext_move.base_move().to(), self.to_move);
+        let prev_piece = match ext_move.base_move().infos() {
+            MoveInfo::Promotion(_) | MoveInfo::CapturePromotion(_) => PAWN,
+            _ => actual_piece
+        };
+        self.add_piece(prev_piece, ext_move.base_move().from(), self.to_move);
 
         if ext_move.base_move().infos() == MoveInfo::EnPassantCapture {
             if self.to_move == WHITE {
@@ -173,6 +181,7 @@ impl Board {
 
 pub trait CastlingRightsExt {
     fn new() -> Self;
+    fn index(&self, color: Color, side: CastlingSide) -> usize;
     fn remove(&mut self, color: Color, side: CastlingSide);
     fn restore(&mut self, color: Color, side: CastlingSide);
     fn has(&self, color: Color, side: CastlingSide) -> bool;
@@ -184,18 +193,22 @@ impl CastlingRightsExt for CastlingRights {
     }
 
     fn remove(&mut self, color: Color, side: CastlingSide) {
-        let mask = 1 << (2*color as u8 + side as u8);
+        let mask = 1 << self.index(color, side);
         *self &= !mask;
     }
     
     fn restore(&mut self, color: Color, side: CastlingSide) {
-        let mask = 1 << (2*color as u8 + side as u8);
+        let mask = 1 << self.index(color, side);
         *self |= mask;
     }
     
     fn has(&self, color: Color, side: CastlingSide) -> bool {
-        let mask = 1 << (2*color as u8 + side as u8);
+        let mask = 1 << self.index(color, side);
         self & mask != 0
+    }
+    
+    fn index(&self, color: Color, side: CastlingSide) -> usize {
+        2*color as usize + side as usize
     }
 }
 

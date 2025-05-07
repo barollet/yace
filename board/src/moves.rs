@@ -139,22 +139,6 @@ const fn ep_into_bits(ep: Option<Square>) -> i8 {
     }
 }
 
-/* 
-impl ExtMoveInfo {
-    const fn from_bits(value: u16) -> Self {
-        Self {
-            captured_piece: Piece::from_u8((value &0b111)as u8),
-        }
-    }
-    const fn into_bits(self) -> u16 {
-        if let Some(piece) = self.captured_piece {
-            piece.ordinal() as u16
-        } else {
-            0b111
-        }
-    }
-}*/
-
 impl Debug for Move {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Move").field("from", &self.from().debug()).field("to", &self.to().debug()).field("infos", &self.infos()).finish()
