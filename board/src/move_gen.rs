@@ -21,7 +21,7 @@ const CAPTURE: u8 = 1;
 const EVASION: u8 = 2;
 const NON_EVASION: u8 = 3;
 
-const MAX_MOVE_NUMBER: usize = 256;
+pub const MAX_MOVE_NUMBER: usize = 256;
 
 impl Board {
     pub fn legal_move_gen(&self) -> ArrayVec<Move, MAX_MOVE_NUMBER> {
@@ -33,26 +33,40 @@ impl Board {
     }
 
     fn bishop_attack(&self, sq: Square) -> Bitboard {
-        let occupancy = self.pieces[WHITE] | self.pieces[BLACK];
-        bishop_attack(sq, occupancy)
+        bishop_attack(sq, self.occupancy())
     }
 
     fn rook_attack(&self, sq: Square) -> Bitboard {
-        let occupancy = self.pieces[WHITE] | self.pieces[BLACK];
-        rook_attack(sq, occupancy)
+        rook_attack(sq, self.occupancy())
     }
 
     pub fn square_attacked_by<const MY_COLOR: bool>(&self, sq: Square) -> Bitboard {
-        self.square_attacked_by_with_occ::<MY_COLOR>(sq, self.pieces[WHITE] | self.pieces[BLACK])
+        self.square_attacked_by_with_occ::<MY_COLOR>(sq, self.occupancy())
     }
 
-    fn square_attacked_by_with_occ<const MY_COLOR: bool>(&self, sq: Square, occupancy: Bitboard) -> Bitboard {
+    pub fn square_attacked_by_with_occ<const MY_COLOR: bool>(&self, sq: Square, occupancy: Bitboard) -> Bitboard {
         bishop_attack(sq, occupancy) & self.pieces[!MY_COLOR] & (self.bitboards[BISHOP] | self.bitboards[QUEEN])
         | rook_attack(sq, occupancy) & self.pieces[!MY_COLOR] & (self.bitboards[ROOK] | self.bitboards[QUEEN])
         | KNIGHT_ATTACK[sq as usize] & self.pieces[!MY_COLOR] & self.bitboards[KNIGHT]
         | KING_ATTACK[sq as usize] & self.pieces[!MY_COLOR] & self.bitboards[KING]
         | self.pieces[!MY_COLOR] & self.bitboards[PAWN] & sq.forward_left::<MY_COLOR>().map_or(EMPTY, Square::as_bitboard)
         | self.pieces[!MY_COLOR] & self.bitboards[PAWN] & sq.forward_right::<MY_COLOR>().map_or(EMPTY, Square::as_bitboard)
+    }
+
+    pub fn square_full_attacked_by(&self, sq: Square, occupancy: Bitboard) -> Bitboard {
+        bishop_attack(sq, occupancy) & (self.bitboards[BISHOP] | self.bitboards[QUEEN])
+        | rook_attack(sq, occupancy) & (self.bitboards[ROOK] | self.bitboards[QUEEN])
+        | KNIGHT_ATTACK[sq as usize] & self.bitboards[KNIGHT]
+        | KING_ATTACK[sq as usize] & self.bitboards[KING]
+        |    (sq.forward_left::<WHITE>().map_or(EMPTY, Square::as_bitboard)
+            | sq.forward_right::<WHITE>().map_or(EMPTY, Square::as_bitboard)
+            | sq.forward_left::<BLACK>().map_or(EMPTY, Square::as_bitboard)
+            | sq.forward_right::<BLACK>().map_or(EMPTY, Square::as_bitboard)) & self.bitboards[PAWN]
+    }
+
+    pub fn square_xray_update(&self, sq: Square, occupancy: Bitboard) -> Bitboard {
+        bishop_attack(sq, occupancy) & (self.bitboards[BISHOP] | self.bitboards[QUEEN])
+        | rook_attack(sq, occupancy) & (self.bitboards[ROOK] | self.bitboards[QUEEN])
     }
 
     fn pinned_pieces(&self) -> Bitboard {
@@ -65,7 +79,7 @@ impl Board {
             | bishop_attack(king_square, EMPTY) & (self.bitboards[BISHOP] | self.bitboards[QUEEN]) & enemy_pieces;
 
         for start_square in BitIter::from(snipers) {
-            let line = Bitboard::between(start_square as Square, king_square).unset(start_square as Square) & (self.pieces[WHITE] | self.pieces[BLACK]);
+            let line = Bitboard::between(start_square as Square, king_square).unset(start_square as Square) & self.occupancy();
 
             if line.count_ones() == 1 {
                 pinned |= line;

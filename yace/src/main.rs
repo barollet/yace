@@ -1,6 +1,13 @@
 use board::Board;
 
+mod move_ordering;
+mod search;
+
 fn main() {
+    benchmark_perft();
+}
+
+fn benchmark_perft() {
     let mut board = Board::new();
     board.perft::<false>(6);
 

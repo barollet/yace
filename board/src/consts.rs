@@ -24,6 +24,19 @@ pub const ROOK_ORDINAL: u8 = ROOK.ordinal() as u8;
 pub const QUEEN_ORDINAL: u8 = QUEEN.ordinal() as u8;
 pub const KING_ORDINAL: u8 = KING.ordinal() as u8;
 
+impl Piece {
+    pub const fn value(&self) -> u16 {
+        match self {
+            Piece::Pawn => 100,
+            Piece::Knight => 325,
+            Piece::Bishop => 325,
+            Piece::Rook => 500,
+            Piece::Queen => 1000,
+            Piece::King => 5000,
+        }
+    }
+}
+
 impl From<Piece> for usize {
     fn from(value: Piece) -> Self {
         value.as_u8() as usize

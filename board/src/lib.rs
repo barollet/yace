@@ -5,24 +5,24 @@ use move_gen::{ROOK_CASTLING_DEST, ROOK_CASTLING_START};
 use moves::{ExtendedMove, Move, MoveInfo};
 
 pub mod bitboard;
-mod consts;
+pub mod consts;
 mod enum_indexed;
 pub mod fen;
 pub mod magic_table;
-mod move_gen;
-mod moves;
+pub mod move_gen;
+pub mod moves;
 mod square;
 
 pub type CastlingRights = u8;
 
 #[derive(Clone, Debug)]
 pub struct Board {
-    pieces: ColorIndexed<Bitboard>,
-    bitboards: PieceIndexed<Bitboard>,
-    squares: [Option<Piece>; 64],
+    pub pieces: ColorIndexed<Bitboard>,
+    pub bitboards: PieceIndexed<Bitboard>,
+    pub squares: [Option<Piece>; 64],
     castling_rights: CastlingRights,
     ep_target: Option<Square>,
-    to_move: Color,
+    pub to_move: Color,
 }
 
 pub type CastlingSide = bool;
@@ -206,6 +206,10 @@ impl Board {
 
     fn king_square(&self, color: Color) -> Square {
         (self.bitboards[KING] & self.pieces[color]).lsb()
+    }
+
+    pub fn occupancy(&self) -> Bitboard {
+        self.pieces[WHITE] | self.pieces[BLACK]
     }
 
     fn checkers<const COLOR: bool>(&self) -> Bitboard {

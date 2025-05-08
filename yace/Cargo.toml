@@ -5,3 +5,5 @@ edition = "2024"
 
 [dependencies]
 board = { path = "../board"}
+arrayvec = "0.7.6"
+
