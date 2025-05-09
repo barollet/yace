@@ -1,9 +1,8 @@
 use std::fmt::Debug;
 
-use crate::{bitboard::*, CastlingRights};
 use bitfield_struct::bitfield;
 
-use crate::consts::*;
+use super::*;
 
 #[bitfield(u16, debug=false)]
 pub struct Move {
@@ -149,10 +148,6 @@ impl Debug for Move {
 
 #[cfg(test)]
 mod tests {
-    use crate::bitboard::*;
-    use crate::consts::*;
-    use crate::*;
-
     use super::*;
 
     #[test]

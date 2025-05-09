@@ -1,13 +1,13 @@
 use std::cell::RefCell;
 
-use board::bitboard::*;
-use board::magic_table::*;
+use crate::board::bitboard::*;
+use crate::board::magic_table::*;
 
 use rand::prelude::*;
 
 const NTRIES: usize = 10000000;
-const BISHOP: bool = true;
-const ROOK: bool = false;
+const DO_BISHOP: bool = true;
+const DO_ROOK: bool = false;
 thread_local! {
     static RNG: RefCell<ThreadRng> = RefCell::new(rand::rng());
 }
@@ -61,10 +61,10 @@ fn find_magic_factor(sq: Square, is_bishop: bool) -> usize {
 fn main() {
     println!("Bishop magic");
     for sq in 0..64 {
-        println!("{:#018x},", find_magic_factor(sq, BISHOP));
+        println!("{:#018x},", find_magic_factor(sq, DO_BISHOP));
     }
     println!("Rook magic");
     for sq in 0..64 {
-        println!("{:#018x},", find_magic_factor(sq, ROOK));
+        println!("{:#018x},", find_magic_factor(sq, DO_ROOK));
     }
 }

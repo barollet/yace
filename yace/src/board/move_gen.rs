@@ -2,10 +2,8 @@ use std::sync::LazyLock;
 
 use arrayvec::ArrayVec;
 use bit_iter::BitIter;
-use crate::bitboard::*;
-use crate::*;
 
-use crate::{magic_table::{bishop_attack, rook_attack}, moves::*, Board};
+use super::{magic_table::bishop_attack, magic_table::rook_attack, *};
 
 static KNIGHT_ATTACK: LazyLock<[Bitboard; 64]> = LazyLock::new(initialize_knight_attack);
 static KING_ATTACK: LazyLock<[Bitboard; 64]> = LazyLock::new(initialize_king_attack);

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["generate_magic", "board", "yace"]
+members = ["yace"]
 
 [profile.release]
 codegen-units = 1

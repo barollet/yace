@@ -1,4 +1,4 @@
-use crate::*;
+use super::*;
 
 pub const A: i8 = 0;
 pub const B: i8 = 1;

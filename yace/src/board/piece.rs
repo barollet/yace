@@ -32,7 +32,7 @@ impl Piece {
             Piece::Bishop => 325,
             Piece::Rook => 500,
             Piece::Queen => 1000,
-            Piece::King => 5000,
+            Piece::King => 20000,
         }
     }
 }

@@ -1,8 +1,0 @@
-[package]
-name = "generate_magic"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-board = { path = "../board"}
-rand = "0.9.1"

@@ -1,10 +1,7 @@
-use std::cmp::{max, Ordering};
+use std::cmp::max;
 
 use arrayvec::ArrayVec;
-use board::move_gen::MAX_MOVE_NUMBER;
-use board::*;
-use board::consts::*;
-use board::moves::*;
+use crate::board::*;
 
 // TODO pinned pieces are still able to capture here
 pub fn static_exchange_evaluation(board: &Board, from: Square, to: Square) -> i16 {
@@ -88,7 +85,7 @@ pub fn order_moves(board: &Board, moves: &mut ArrayVec<Move, MAX_MOVE_NUMBER>, l
 
 #[cfg(test)]
 mod tests {
-    use board::*;
+    use crate::board::*;
     use super::*;
 
     #[test]

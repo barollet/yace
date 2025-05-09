@@ -1,17 +1,21 @@
-pub use bitboard::*;
-use consts::*;
+pub use self::piece::*;
+pub use self::bitboard::*;
+pub use self::move_gen::*;
+pub use self::moves::*;
+pub use self::square::*;
+
 use enum_indexed::*;
-use move_gen::{ROOK_CASTLING_DEST, ROOK_CASTLING_START};
-use moves::{ExtendedMove, Move, MoveInfo};
 
 pub mod bitboard;
-pub mod consts;
-mod enum_indexed;
+pub mod piece;
 pub mod fen;
+pub mod square;
 pub mod magic_table;
 pub mod move_gen;
 pub mod moves;
-mod square;
+
+mod generate_magic;
+mod enum_indexed;
 
 pub type CastlingRights = u8;
 

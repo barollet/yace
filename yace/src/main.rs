@@ -1,7 +1,9 @@
 use board::Board;
 
+mod board;
 mod move_ordering;
 mod search;
+mod evaluation;
 
 fn main() {
     benchmark_perft();

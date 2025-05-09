@@ -1,5 +1,5 @@
-use crate::magic_table::bishop_attack;
-pub use crate::square::*;
+use crate::board::magic_table::bishop_attack;
+pub use crate::board::square::*;
 
 pub type Color = bool;
 

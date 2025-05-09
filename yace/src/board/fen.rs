@@ -1,5 +1,4 @@
-use crate::consts::*;
-use crate::*;
+use super::*;
 
 impl Board {
     pub fn from_fen(fen_string: &str) -> Option<Self> {
