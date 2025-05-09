@@ -53,29 +53,36 @@ fn least_valuable_attacker(board: &Board, both_color_attacker: Bitboard, attacki
     None
 }
 
-fn compare_moves(board: &Board, move1: Move, move2: Move, last_moved_piece: Square) -> Ordering {
-    // recapture heuristic
-    if move1.to() == last_moved_piece && move2.to() == last_moved_piece {
-        compare_last_recapture(board, move1, move2)
-    } else if move1.to() == last_moved_piece {
-        Ordering::Greater
-    } else if move2.to() == last_moved_piece {
-        Ordering::Less
-    // mvv-lva
-    } else {
-        Ordering::Equal
+fn move_sorting_key(board: &Board, m: Move, last_moved_piece: Square) -> (u8, i16) {
+    let see = static_exchange_evaluation(board, m.from(), m.to());
+    let capture = matches!(m.infos(), MoveInfo::Capture | MoveInfo::CapturePromotion(_));
+    let from_piece = board.squares[m.from() as usize].unwrap();
+
+
+    // recapture
+    if m.to() == last_moved_piece {
+        (1, from_piece.value() as i16)
+    }
+    // SEE > 0
+    else if see > 0 {
+        (2, -see)
+    }
+    // SEE = 0
+    else if capture && see == 0 {
+        (3, from_piece.value() as i16)
+    }
+    // SEE < 0
+    else if see < 0 {
+        (4, -see)
+    }
+    // Quiet
+    else {
+        (5,  from_piece.value() as i16)
     }
 }
 
-fn compare_last_recapture(board: &Board, move1: Move, move2: Move) -> Ordering {
-    let piece1 = board.squares[move1.from() as usize].unwrap();
-    let piece2 = board.squares[move2.from() as usize].unwrap();
-
-    piece1.value().cmp(&piece2.value()).reverse() // smallest attacker first
-}
-
 pub fn order_moves(board: &Board, moves: &mut ArrayVec<Move, MAX_MOVE_NUMBER>, last_moved_piece: Square) {
-    moves.sort_by(|&m1, &m2| compare_moves(board, m1, m2, last_moved_piece));
+    moves.sort_by_cached_key(|&m| move_sorting_key(board, m, last_moved_piece));
 }
 
 
