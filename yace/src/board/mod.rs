@@ -30,7 +30,7 @@ pub struct Board {
     ep_target: Option<Square>,
     pub to_move: Color,
 
-    evaluation: IncrementalEval,
+    pub evaluation: IncrementalEval,
 }
 
 pub type CastlingSide = bool;
