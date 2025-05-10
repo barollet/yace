@@ -106,6 +106,16 @@ impl IncrementalEval {
         IncrementalEval { material_evaluation: 0, position_evaluation: 0 }
     }
 
+    pub fn move_piece(&mut self, piece: Piece, from: Square, to: Square, color: Color) {
+        if color == WHITE {
+            self.position_evaluation -= piece_positional_value(piece, from, color);
+            self.position_evaluation += piece_positional_value(piece, to, color);
+        } else {
+            self.position_evaluation += piece_positional_value(piece, from, color);
+            self.position_evaluation -= piece_positional_value(piece, to, color);
+        }
+    }
+
     pub fn add_piece(&mut self, piece: Piece, sq: Square, color: Color) {
         if color == WHITE {
             self.material_evaluation += piece.value() as i16;

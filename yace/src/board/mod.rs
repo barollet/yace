@@ -93,12 +93,17 @@ impl Board {
             }
         }
 
-        let rem_piece = self.remove_piece(to_play.from(), self.to_move);
-        let new_piece = match to_play.infos() {
-            MoveInfo::Promotion(prom_piece) | MoveInfo::CapturePromotion(prom_piece) => prom_piece,
-            _ => rem_piece
+
+        // Actual movement
+        match to_play.infos() {
+            MoveInfo::Promotion(prom_piece) | MoveInfo::CapturePromotion(prom_piece) => {
+                self.remove_piece(to_play.from(), self.to_move);
+                self.add_piece(prom_piece, to_play.to(), self.to_move);
+            },
+            _ => {
+                self.move_piece(to_play.from(), to_play.to(), self.to_move);
+            }
         };
-        self.add_piece(new_piece, to_play.to(), self.to_move);
 
         // Move rook on castling
         match to_play.infos() {
@@ -154,12 +159,17 @@ impl Board {
             _ => (),
         }
 
-        let actual_piece: Piece = self.remove_piece(ext_move.base_move().to(), self.to_move);
-        let prev_piece = match ext_move.base_move().infos() {
-            MoveInfo::Promotion(_) | MoveInfo::CapturePromotion(_) => PAWN,
-            _ => actual_piece
+        // Actual movement
+        match ext_move.base_move().infos() {
+            MoveInfo::Promotion(_) | MoveInfo::CapturePromotion(_) => {
+                self.remove_piece(ext_move.base_move().to(), self.to_move);
+                self.add_piece(PAWN, ext_move.base_move().from(), self.to_move);
+            },
+            _ => {
+                self.move_piece(ext_move.base_move().to(), ext_move.base_move().from(), self.to_move);
+            }
         };
-        self.add_piece(prev_piece, ext_move.base_move().from(), self.to_move);
+
 
         if ext_move.base_move().infos() == MoveInfo::EnPassantCapture {
             if self.to_move == WHITE {
@@ -197,8 +207,17 @@ impl Board {
     }
 
     fn move_piece(&mut self, from: Square, to: Square, color: Color) {
-        let piece = self.remove_piece(from, color);
-        self.add_piece(piece, to, color);
+        let piece = self.squares[from as usize].unwrap();
+        self.squares[to as usize] = self.squares[from as usize];
+        self.squares[from as usize] = None;
+
+        self.bitboards[piece] &= !from.as_bitboard();
+        self.bitboards[piece] |= to.as_bitboard();
+
+        self.pieces[color] &= !from.as_bitboard();        
+        self.pieces[color] |= to.as_bitboard();
+
+        self.evaluation.move_piece(piece, from, to, color);
     }
 
     fn king_square(&self, color: Color) -> Square {
