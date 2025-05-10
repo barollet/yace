@@ -93,6 +93,7 @@ pub trait SquareExt {
     fn forward_right<const COLOR: bool>(self) -> Option<Square>;
     fn backward_left<const COLOR: bool>(self) -> Option<Square>;
     fn backward_right<const COLOR: bool>(self) -> Option<Square>;
+    fn vertical_symmetry(self) -> Square;
     fn as_bitboard(self) -> Bitboard;
     fn debug(self) -> String;
 }
@@ -202,5 +203,9 @@ impl SquareExt for Square {
         } else {
             None
         }
+    }
+
+    fn vertical_symmetry(self) -> Square {
+        Self::new(self.file(), 7-self.rank())
     }
 }

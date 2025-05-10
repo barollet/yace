@@ -1,3 +1,5 @@
+use crate::evaluation::IncrementalEval;
+
 pub use self::piece::*;
 pub use self::bitboard::*;
 pub use self::move_gen::*;
@@ -27,6 +29,8 @@ pub struct Board {
     castling_rights: CastlingRights,
     ep_target: Option<Square>,
     pub to_move: Color,
+
+    evaluation: IncrementalEval,
 }
 
 pub type CastlingSide = bool;
@@ -35,35 +39,17 @@ pub const QUEENSIDE: CastlingSide = true;
 
 impl Board {
     pub fn new() -> Self {
-        let mut pieces = ColorIndexed::new();
-        pieces[WHITE] = RANK1 | RANK2;
-        pieces[BLACK] = RANK7 | RANK8;
+        let mut board = Self::empty();
 
-        let mut bitboards = PieceIndexed::new();
-        bitboards[PAWN] = RANK2 | RANK7;
-        bitboards[KNIGHT] = B1.as_bitboard() | G1.as_bitboard() | B8.as_bitboard() | G8.as_bitboard();
-        bitboards[BISHOP] = C1.as_bitboard() | F1.as_bitboard() | C8.as_bitboard() | F8.as_bitboard();
-        bitboards[ROOK] = A1.as_bitboard() | H1.as_bitboard() | A8.as_bitboard() | H8.as_bitboard();
-        bitboards[QUEEN] = D1.as_bitboard() | D8.as_bitboard();
-        bitboards[KING] = E1.as_bitboard() | E8.as_bitboard();
-
-        let mut squares = [None; 64];
         let backrank = [ROOK, KNIGHT, BISHOP, QUEEN, KING, BISHOP, KNIGHT, ROOK];
         for (&file, piece) in FILE_LIST.iter().zip(backrank) {
-            squares[square_from_name(file, 2) as usize] = Some(PAWN);
-            squares[square_from_name(file, 7) as usize] = Some(PAWN);
-            squares[square_from_name(file, 1) as usize] = Some(piece);
-            squares[square_from_name(file, 8) as usize] = Some(piece);
+            board.add_piece(PAWN, square_from_name(file, 2), WHITE);
+            board.add_piece(PAWN, square_from_name(file, 7), BLACK);
+            board.add_piece(piece, square_from_name(file, 1), WHITE);
+            board.add_piece(piece, square_from_name(file, 8), BLACK);
         }
         
-        Board {
-            pieces,
-            bitboards,
-            squares,
-            ep_target: None,
-            castling_rights: CastlingRights::new(),
-            to_move: WHITE,
-        }
+        board
     }
 
     pub fn empty() -> Self {
@@ -74,6 +60,8 @@ impl Board {
             ep_target: None,
             castling_rights: CastlingRights::new(),
             to_move: WHITE,
+
+            evaluation: IncrementalEval::new(),
         }
     }
 
@@ -193,6 +181,8 @@ impl Board {
         self.squares[sq as usize] = Some(piece);
         self.bitboards[piece] |= sq.as_bitboard();
         self.pieces[color] |= sq.as_bitboard();
+
+        self.evaluation.add_piece(piece, sq, color);
     }
 
     fn remove_piece(&mut self, sq: Square, color: Color) -> Piece {
@@ -200,6 +190,9 @@ impl Board {
         self.squares[sq as usize] = None;
         self.bitboards[piece] &= !sq.as_bitboard();
         self.pieces[color] &= !sq.as_bitboard();
+
+        self.evaluation.remove_piece(piece, sq, color);
+
         piece
     }
 
