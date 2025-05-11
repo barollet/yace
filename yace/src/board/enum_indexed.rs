@@ -1,4 +1,4 @@
-use std::ops::{Index, IndexMut};
+use std::{array, ops::{Index, IndexMut}};
 
 #[derive(Clone, Debug)]
 pub struct ConstIndexed<T, const N: usize>(pub [T; N]);
@@ -9,6 +9,12 @@ pub type PieceIndexed<T> = ConstIndexed<T, 6>;
 impl<T, const N: usize> ConstIndexed<T, N> where T: Default + Copy {
     pub fn new() -> Self {
         Self([T::default(); N])
+    }
+}
+
+impl<T, const N: usize> ConstIndexed<T, N> {
+    pub fn from_fn<F: FnMut(usize) -> T>(cb: F) -> Self {
+        Self(array::from_fn(cb))
     }
 }
 

@@ -96,6 +96,7 @@ impl Board {
             }
             moves.len()
         } else {
+            let hash = self.zobrist_hash;
             let mut count = 0;
             for to_play in self.legal_move_gen() {
                 let ext_move = self.make(to_play);
@@ -106,6 +107,7 @@ impl Board {
                 count += local_count;
                 self.unmake(ext_move);
             }
+            assert_eq!(hash, self.zobrist_hash); // TODO remove this assertion at some point
             count
         }
     }

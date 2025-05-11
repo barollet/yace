@@ -7,6 +7,8 @@ pub use self::moves::*;
 pub use self::square::*;
 
 use enum_indexed::*;
+use zobrist::ZobristHash;
+use zobrist::ZobristHasher;
 
 pub mod bitboard;
 pub mod piece;
@@ -16,6 +18,7 @@ pub mod magic_table;
 pub mod move_gen;
 pub mod moves;
 
+mod zobrist;
 mod generate_magic;
 mod enum_indexed;
 
@@ -31,6 +34,7 @@ pub struct Board {
     pub to_move: Color,
 
     pub evaluation: IncrementalEval,
+    pub zobrist_hash: ZobristHash,
 }
 
 pub type CastlingSide = bool;
@@ -62,6 +66,7 @@ impl Board {
             to_move: WHITE,
 
             evaluation: IncrementalEval::new(),
+            zobrist_hash: ZobristHasher::new_hash(),
         }
     }
 
@@ -69,6 +74,7 @@ impl Board {
     pub fn make(&mut self, to_play: Move) -> ExtendedMove {
         let past_ep_state = self.ep_target;
         let past_castle = self.castling_rights;
+        self.zobrist_hash.handle_castling(past_castle);
 
         // For en passant the captured piece is not set to pawn as we already know it
         let captured_piece = match to_play.infos() {
@@ -130,21 +136,34 @@ impl Board {
         }
 
         // Setting ep state on double push
+        self.zobrist_hash.handle_ep(self.ep_target);
         if to_play.infos() == MoveInfo::DoublePawnPush {
-            self.ep_target = Some(to_play.to())
+            self.ep_target = Some(to_play.to());
         } else {
-            self.ep_target = None
+            self.ep_target = None;
         }
+        self.zobrist_hash.handle_ep(self.ep_target);
+
+        self.zobrist_hash.handle_castling(self.castling_rights);
 
         self.to_move = !self.to_move;
+        self.zobrist_hash.handle_side_to_move();
 
         ExtendedMove::new_base(to_play, captured_piece, past_ep_state, past_castle)
     }
 
     pub fn unmake(&mut self, ext_move: ExtendedMove) {
         self.to_move = !self.to_move;
+        self.zobrist_hash.handle_side_to_move();
+
+        // Remove and restore
+        self.zobrist_hash.handle_ep(self.ep_target);
         self.ep_target = ext_move.infos().past_epstate();
+        self.zobrist_hash.handle_ep(self.ep_target);
+
+        self.zobrist_hash.handle_castling(self.castling_rights);
         self.castling_rights = ext_move.infos().past_castle();
+        self.zobrist_hash.handle_castling(self.castling_rights);
 
         // Restore old rook position on castle
         match ext_move.base_move().infos() {
@@ -193,6 +212,7 @@ impl Board {
         self.pieces[color] |= sq.as_bitboard();
 
         self.evaluation.add_piece(piece, sq, color);
+        self.zobrist_hash.handle_piece(sq, piece, color);
     }
 
     fn remove_piece(&mut self, sq: Square, color: Color) -> Piece {
@@ -202,6 +222,7 @@ impl Board {
         self.pieces[color] &= !sq.as_bitboard();
 
         self.evaluation.remove_piece(piece, sq, color);
+        self.zobrist_hash.handle_piece(sq, piece, color);
 
         piece
     }
@@ -218,6 +239,8 @@ impl Board {
         self.pieces[color] |= to.as_bitboard();
 
         self.evaluation.move_piece(piece, from, to, color);
+        self.zobrist_hash.handle_piece(from, piece, color);
+        self.zobrist_hash.handle_piece(to, piece, color);
     }
 
     fn king_square(&self, color: Color) -> Square {
